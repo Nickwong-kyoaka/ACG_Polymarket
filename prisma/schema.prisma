@@ -1,0 +1,424 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum RightsType {
+  ORIGINAL
+  LICENSED
+}
+
+enum AssetKind {
+  HERO
+  CARD
+  THUMB
+  WALLPAPER
+  AVATAR_FRAME
+  PROFILE_THEME
+}
+
+enum AssetWorkflowStatus {
+  UPLOADED
+  NORMALIZED
+  TAGGED
+  RIGHTS_CHECKED
+  REVIEWED
+  PUBLISHED
+  PULLED
+}
+
+enum CurrencyType {
+  SOFT
+  PREMIUM
+}
+
+enum LedgerReferenceType {
+  STARTER_GRANT
+  DAILY_REWARD
+  AD_REWARD
+  BUY_SUPPORT
+  SELL_SUPPORT
+  SHOP_PURCHASE
+}
+
+enum NotificationType {
+  SYSTEM
+  REWARD
+  TRADE
+  SOCIAL
+  SHOP
+}
+
+enum SourceKind {
+  MANUAL
+  BANGUMI
+}
+
+model User {
+  id             String             @id @default(cuid())
+  email          String?            @unique
+  name           String?
+  image          String?
+  role           UserRole           @default(USER)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  authIdentities AuthIdentity[]
+  sessions       Session[]
+  profile        Profile?
+  wallet         Wallet?
+  positions      SupportPosition[]
+  trades         Trade[]
+  dailyRewards   DailyRewardClaim[]
+  adRewards      AdRewardClaim[]
+  watchlistItems WatchlistItem[]
+  comments       Comment[]
+  reactions      Reaction[]
+  reports        Report[]
+  notifications  Notification[]
+  inventoryItems InventoryItem[]
+}
+
+model AuthIdentity {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String   @unique
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Profile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  handle             String   @unique
+  displayName        String
+  bio                String
+  holdingsVisibility Boolean  @default(true)
+  favoriteTags       String[]
+  pinnedCharacterIds String[]
+  equippedFrameAsset String?
+  equippedThemeAsset String?
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Series {
+  id           String       @id @default(cuid())
+  slug         String       @unique
+  title        String
+  summary      String
+  rightsType   RightsType
+  metadataOnly Boolean      @default(false)
+  bangumiUrl   String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  characters   Character[]
+  rightsGrants RightsGrant[]
+}
+
+model Character {
+  id                String                   @id @default(cuid())
+  seriesId          String
+  slug              String                   @unique
+  name              String
+  title             String
+  summary           String
+  fandomPrompt      String
+  mood              String
+  rightsType        RightsType
+  metadataOnly      Boolean                  @default(false)
+  basePrice         Int
+  priceStep         Int
+  unitsPerStep      Int
+  circulatingUnits  Int                      @default(0)
+  supporterCount    Int                      @default(0)
+  isFeatured        Boolean                  @default(false)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  tags              CharacterTag[]           @relation("CharacterTags")
+  series            Series                   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  attributes        CharacterAttributeValue[]
+  assets            CharacterAsset[]
+  sourceAttribution SourceAttribution?
+  rightsGrants      RightsGrant[]
+  positions         SupportPosition[]
+  trades            Trade[]
+  comments          Comment[]
+  reactions         Reaction[]
+  reports           Report[]
+  watchlistItems    WatchlistItem[]
+}
+
+model CharacterTag {
+  id         String      @id @default(cuid())
+  label      String      @unique
+  characters Character[] @relation("CharacterTags")
+}
+
+model AttributeDefinition {
+  id           String                  @id @default(cuid())
+  key          String                  @unique
+  label        String
+  valueType    String
+  filterable   Boolean                 @default(true)
+  sortable     Boolean                 @default(false)
+  displayable  Boolean                 @default(true)
+  sensitive    Boolean                 @default(false)
+  spoiler      Boolean                 @default(false)
+  displayOrder Int                     @default(0)
+  options      AttributeOption[]
+  values       CharacterAttributeValue[]
+}
+
+model AttributeOption {
+  id           String              @id @default(cuid())
+  definitionId String
+  label        String
+  value        String
+  displayOrder Int                 @default(0)
+  definition   AttributeDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+}
+
+model CharacterAttributeValue {
+  id           String              @id @default(cuid())
+  characterId  String
+  definitionId String
+  value        String
+  character    Character           @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  definition   AttributeDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([characterId, definitionId])
+}
+
+model CharacterAsset {
+  id             String              @id @default(cuid())
+  characterId    String?
+  kind           AssetKind
+  label          String
+  storageKey     String
+  altText        String
+  workflowStatus AssetWorkflowStatus @default(UPLOADED)
+  publishedAt    DateTime?
+  version        Int                 @default(1)
+  metadata       Json?
+  rightsGrantId  String?
+  character      Character?          @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  rightsGrant    RightsGrant?        @relation(fields: [rightsGrantId], references: [id])
+}
+
+model RightsGrant {
+  id                String           @id @default(cuid())
+  seriesId          String?
+  characterId       String?
+  licensor          String
+  contractReference String
+  territories       String[]
+  salesChannels     String[]
+  allowedUseTypes   String[]
+  attributionText   String
+  takedownContact   String
+  embargoAt         DateTime?
+  expiresAt         DateTime?
+  commercialUse     Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  series            Series?          @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  character         Character?       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  assets            CharacterAsset[]
+}
+
+model SourceAttribution {
+  id              String     @id @default(cuid())
+  characterId     String     @unique
+  sourceKind      SourceKind
+  sourceLabel     String
+  sourceUrl       String
+  licenseName     String
+  attributionText String
+  importedText    String?
+  originalAuthor  String?
+  importedAt      DateTime   @default(now())
+  character       Character  @relation(fields: [characterId], references: [id], onDelete: Cascade)
+}
+
+model Wallet {
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  softBalance    Int           @default(0)
+  premiumBalance Int           @default(0)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntries  LedgerEntry[]
+}
+
+model LedgerEntry {
+  id             String              @id @default(cuid())
+  walletId       String
+  currencyType   CurrencyType
+  delta          Int
+  balanceAfter   Int
+  referenceType  LedgerReferenceType
+  referenceId    String
+  idempotencyKey String              @unique
+  createdAt      DateTime            @default(now())
+  wallet         Wallet              @relation(fields: [walletId], references: [id], onDelete: Cascade)
+}
+
+model SupportPosition {
+  id          String    @id @default(cuid())
+  userId      String
+  characterId String
+  units       Int       @default(0)
+  averageCost Int       @default(0)
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, characterId])
+}
+
+model Trade {
+  id          String    @id @default(cuid())
+  userId      String
+  characterId String
+  side        String
+  quantity    Int
+  totalCost   Int
+  unitPrice   Int
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+}
+
+model DailyRewardClaim {
+  id        String   @id @default(cuid())
+  userId    String
+  dayKey    String
+  amount    Int
+  claimedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayKey])
+}
+
+model AdRewardClaim {
+  id        String   @id @default(cuid())
+  userId    String
+  dayKey    String
+  amount    Int
+  claimedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WatchlistItem {
+  id          String    @id @default(cuid())
+  userId      String
+  characterId String
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, characterId])
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  userId      String
+  characterId String
+  content     String
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  reports     Report[]
+}
+
+model Reaction {
+  id          String    @id @default(cuid())
+  userId      String
+  characterId String
+  kind        String
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, characterId, kind])
+}
+
+model Report {
+  id          String    @id @default(cuid())
+  userId      String
+  characterId String?
+  commentId   String?
+  reason      String
+  detail      String?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  comment     Comment?   @relation(fields: [commentId], references: [id], onDelete: SetNull)
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  type      NotificationType
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ShopCollection {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  title       String
+  description String
+  items       ShopItem[]
+}
+
+model ShopItem {
+  id             String          @id @default(cuid())
+  collectionId   String
+  slug           String          @unique
+  title          String
+  description    String
+  kind           AssetKind
+  currencyType   CurrencyType
+  price          Int
+  previewLabel   String
+  unlockPayload  Json
+  published      Boolean         @default(true)
+  collection     ShopCollection  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  inventoryItems InventoryItem[]
+}
+
+model InventoryItem {
+  id         String    @id @default(cuid())
+  userId     String
+  shopItemId String
+  equipped   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopItem   ShopItem  @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shopItemId])
+}
