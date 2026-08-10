@@ -4,20 +4,46 @@ on:
   push:
     branches:
       - main
-      - codex/**
   pull_request:
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: acg_polymarket
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d acg_polymarket"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/acg_polymarket?schema=public
+      AUTH_SECRET: ci-auth-secret
+      NEXTAUTH_SECRET: ci-auth-secret
+      NEXTAUTH_URL: http://localhost:3000
+      ADMIN_EMAILS: admin@example.com
+      BANGUMI_USER_AGENT: ACG_Polymarket CI (+https://github.com/Nickwong-kyoaka/ACG_Polymarket)
+      ADS_PROVIDER: mock
+      DEMO_MODE: "true"
+      DEMO_ADMIN_ENABLED: "true"
+      DEMO_USER_ID: viewer-001
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run prisma:generate
+      - run: npx prisma validate
+      - run: npx prisma db push --skip-generate
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test

@@ -82,6 +82,19 @@ npm run dev
 
 - The repository includes a full Prisma schema for the target production model.
 - The MVP currently uses a seeded in-memory store for interactive demo behavior, which keeps the app usable before a real database layer is wired through every route.
+- Render uses `npm run db:push` as a beta pre-deploy schema sync until real Prisma migrations are added.
+
+## Render deployment
+
+This repo includes `render.yaml` for a Render Node web service on `main`, following Render's full Next.js web-service path instead of a static export.
+
+1. Connect the GitHub repo to Render as a Blueprint.
+2. Use a Neon or other durable Postgres URL for `DATABASE_URL`; Render's free Postgres is useful for temporary tests but not durable long-term.
+3. Set `NEXTAUTH_URL` to the Render public URL or custom domain, and keep `AUTH_SECRET` and `NEXTAUTH_SECRET` populated with long random secrets.
+4. Leave `ADS_PROVIDER=mock` until Google ads are approved, then fill `GOOGLE_AD_CLIENT`.
+5. Fill the `S3_*` values only when asset upload storage is connected.
+
+The Render service builds with `npm ci && npm run prisma:generate && npm run build`, starts with `npm run start -- -H 0.0.0.0 -p $PORT`, and auto-deploys from `main` after GitHub checks pass.
 
 ## Content policy
 
@@ -100,6 +113,5 @@ The current repo passes:
 
 ## Git workflow
 
-- active branch prefix: `codex/`
-- current implementation branch: `codex/mvp-bootstrap`
+- active branch: `main`
 - remote backup: [Nickwong-kyoaka/ACG_Polymarket](https://github.com/Nickwong-kyoaka/ACG_Polymarket)
