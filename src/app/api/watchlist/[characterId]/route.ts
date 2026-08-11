@@ -7,7 +7,7 @@ export async function DELETE(
 ) {
   try {
     const { characterId } = await params;
-    return apiOk(toggleWatchlist(characterId));
+    return apiOk(await toggleWatchlist(characterId));
   } catch (error) {
     return handleApiError(error);
   }

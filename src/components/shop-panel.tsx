@@ -14,24 +14,39 @@ export function ShopPanel({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [pending, startTransition] = useTransition();
 
   async function purchase(itemId: string) {
-    const response = await fetch("/api/shop/purchase", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId, equip: true }),
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      setStatus(payload.error ?? "Purchase failed.");
+    if (submitting) {
       return;
     }
 
-    setStatus("Cosmetic unlocked and equipped.");
-    startTransition(() => router.refresh());
+    setSubmitting(true);
+    setStatus(null);
+    const idempotencyKey = crypto.randomUUID();
+
+    try {
+      const response = await fetch("/api/shop/purchase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ itemId, equip: true, idempotencyKey }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setStatus(payload.error ?? "Purchase failed.");
+        return;
+      }
+
+      setStatus("Cosmetic unlocked and equipped.");
+      startTransition(() => router.refresh());
+    } finally {
+      setSubmitting(false);
+    }
   }
+
+  const busy = submitting || pending;
 
   return (
     <div className="grid gap-5">
@@ -53,7 +68,7 @@ export function ShopPanel({
                 <p className="text-lg font-semibold text-slate-950">{currencyLabel(item.price)}</p>
                 <button
                   type="button"
-                  disabled={pending}
+                  disabled={busy}
                   onClick={() => purchase(item.id)}
                   className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
                 >

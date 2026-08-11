@@ -13,8 +13,16 @@ export default async function MarketPage({
   const search = typeof params.search === "string" ? params.search : undefined;
   const tag = typeof params.tag === "string" ? params.tag : undefined;
   const rightsType = typeof params.rightsType === "string" ? params.rightsType : undefined;
-  const characters = listCharacters({ search, tag, rightsType });
-  const watchlistIds = getWatchlistIds();
+  const [characters, watchlistIds] = await Promise.all([
+    listCharacters({ search, tag, rightsType }),
+    getWatchlistIds(),
+  ]);
+  const cards = await Promise.all(
+    characters.map(async (character) => ({
+      character,
+      commentCount: await getCommentCount(character.id),
+    })),
+  );
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-12">
@@ -57,12 +65,12 @@ export default async function MarketPage({
       </form>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {characters.map((character) => (
+        {cards.map(({ character, commentCount }) => (
           <CharacterCard
             key={character.id}
             character={character}
             watching={watchlistIds.includes(character.id)}
-            commentCount={getCommentCount(character.id)}
+            commentCount={commentCount}
           />
         ))}
       </div>

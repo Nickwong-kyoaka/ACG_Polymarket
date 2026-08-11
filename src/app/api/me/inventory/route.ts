@@ -1,6 +1,6 @@
 import { apiOk } from "@/lib/api";
 import { getPortfolioView } from "@/lib/store";
 
-export function GET() {
-  return apiOk({ inventory: getPortfolioView().inventory });
+export async function GET() {
+  return apiOk({ inventory: (await getPortfolioView()).inventory });
 }

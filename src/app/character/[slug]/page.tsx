@@ -13,12 +13,12 @@ export default async function CharacterPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const view = getCharacterView(slug);
-  const portfolio = getPortfolioView();
+  const view = await getCharacterView(slug);
+  const portfolio = await getPortfolioView();
   const ownedPosition = portfolio.positions.find(
     (position) => position.character.id === view.character.id,
   );
-  const reactions = getReactionSummary(view.character.id);
+  const reactions = await getReactionSummary(view.character.id);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-12">

@@ -24,11 +24,13 @@ This MVP is intentionally **positive-only**:
 - `/` landing + featured characters
 - `/market` browse and filter characters
 - `/character/[slug]` character detail, attribute table, buy/sell, comments, reactions
+- `/comfort` and `/comfort/[mode]` healing fandom rooms with sweet-talk, ASMR placeholders, and comic panels
 - `/u/[handle]` public profile
 - `/me` portfolio, rewards, cosmetics
 - `/onboarding` sign-in and product intro
 - `/help/market-rules` trust and rights policy
 - `/admin` official-only publishing and Bangumi-aware import tools
+- `/admin/content`, `/admin/imports`, `/admin/assets`, `/admin/shop` beta content operations
 
 ## Local setup
 
@@ -81,8 +83,8 @@ npm run dev
 ## Notes on persistence
 
 - The repository includes a full Prisma schema for the target production model.
-- The MVP currently uses a seeded in-memory store for interactive demo behavior, which keeps the app usable before a real database layer is wired through every route.
-- Render uses `npm run db:push` as a beta pre-deploy schema sync until real Prisma migrations are added.
+- Runtime market, reward, shop, watchlist, comment, reaction, and comfort flows are backed by Prisma/Postgres.
+- Render runs `npm run db:push` and `npm run db:seed` during the beta build so free web services can sync the external Neon/Postgres database.
 
 ## Render deployment
 
@@ -94,7 +96,7 @@ This repo includes `render.yaml` for a Render Node web service on `main`, follow
 4. Leave `ADS_PROVIDER=mock` until Google ads are approved, then fill `GOOGLE_AD_CLIENT`.
 5. Fill the `S3_*` values only when asset upload storage is connected.
 
-The Render service builds with `npm ci && npm run prisma:generate && npm run build`, starts with `npm run start -- -H 0.0.0.0 -p $PORT`, and auto-deploys from `main` after GitHub checks pass.
+The Render service builds with `npm ci && npm run prisma:generate && npm run db:push && npm run db:seed && npm run build`, starts with `npm run start -- -H 0.0.0.0 -p $PORT`, and auto-deploys from `main` after GitHub checks pass.
 
 ## Content policy
 

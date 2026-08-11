@@ -85,7 +85,7 @@ export const comfortModes: ComfortMode[] = [
     colorTo: "#bee9e8",
     supportCharacter: {
       name: "Ren Tsukimori",
-      slug: "ren-tsukimori",
+      slug: "ren-tsukishiro",
       role: "Steady composer",
       line: "One bar at a time. You do not need to finish the whole song tonight.",
     },
@@ -237,7 +237,7 @@ export const comfortModes: ComfortMode[] = [
     colorTo: "#fecdd3",
     supportCharacter: {
       name: "Ren Tsukimori",
-      slug: "ren-tsukimori",
+      slug: "ren-tsukishiro",
       role: "Steady composer",
       line: "Love leaving a bruise does not make your heart foolish.",
     },

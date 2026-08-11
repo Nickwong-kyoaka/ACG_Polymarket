@@ -3,6 +3,7 @@ import { z } from "zod";
 export const tradeSchema = z.object({
   quantity: z.number().int().min(1).max(25),
   userId: z.string().optional(),
+  idempotencyKey: z.string().min(8).max(160).optional(),
 });
 
 export const commentSchema = z.object({
@@ -34,6 +35,7 @@ export const shopPurchaseSchema = z.object({
   itemId: z.string().min(1),
   userId: z.string().optional(),
   equip: z.boolean().optional(),
+  idempotencyKey: z.string().min(8).max(160).optional(),
 });
 
 export const adminCharacterSchema = z.object({
@@ -69,6 +71,12 @@ export const adminAssetSchema = z.object({
     "PULLED",
   ]),
   rightsGrantId: z.string().optional(),
+  sourceKind: z
+    .enum(["AI_GENERATED", "USER_PROVIDED", "BANGUMI_METADATA", "OFFICIAL_REFERENCE"])
+    .optional(),
+  sourceUrl: z.string().url().optional(),
+  attributionText: z.string().min(3).optional(),
+  takedownContact: z.string().min(3).optional(),
 });
 
 export const adminShopItemSchema = z.object({
@@ -95,4 +103,37 @@ export const bangumiImportSchema = z.object({
   licenseName: z.string().optional(),
   attributionText: z.string().optional(),
   originalAuthor: z.string().optional(),
+});
+
+export const bangumiSubjectImportSchema = z.object({
+  subjectId: z.string().min(1),
+  userId: z.string().optional(),
+});
+
+export const comfortSessionSchema = z.object({
+  modeSlug: z.string().min(1).optional(),
+  needText: z.string().trim().max(500).optional(),
+  characterId: z.string().optional(),
+  note: z.string().trim().max(500).optional(),
+  userId: z.string().optional(),
+});
+
+export const comfortReactionSchema = z.object({
+  modeSlug: z.string().min(1),
+  contentId: z.string().optional(),
+  kind: z.enum(["SOOTHED", "SWEET", "REPLAY"]),
+  userId: z.string().optional(),
+});
+
+export const adminComfortContentSchema = z.object({
+  modeSlug: z.string().min(1),
+  characterId: z.string().optional(),
+  kind: z.enum(["SWEET_TALK", "ASMR", "VOICE", "COMIC", "WALLPAPER"]),
+  title: z.string().min(2),
+  body: z.string().min(10),
+  mediaUrl: z.string().optional(),
+  sweetnessLevel: z.number().int().min(1).max(100).optional(),
+  unlockShopItemId: z.string().optional(),
+  published: z.boolean().optional(),
+  userId: z.string().optional(),
 });

@@ -5,7 +5,7 @@ import { createAdminShopItem } from "@/lib/store";
 export async function POST(request: Request) {
   try {
     const payload = adminShopItemSchema.parse(await parseJson(request));
-    return apiOk({ item: createAdminShopItem(payload) });
+    return apiOk({ item: await createAdminShopItem(payload) });
   } catch (error) {
     return handleApiError(error);
   }

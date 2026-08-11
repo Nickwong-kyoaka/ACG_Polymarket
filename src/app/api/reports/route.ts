@@ -5,7 +5,7 @@ import { createReport } from "@/lib/store";
 export async function POST(request: Request) {
   try {
     const payload = reportSchema.parse(await parseJson(request));
-    return apiOk({ report: createReport(payload) });
+    return apiOk({ report: await createReport(payload) });
   } catch (error) {
     return handleApiError(error);
   }

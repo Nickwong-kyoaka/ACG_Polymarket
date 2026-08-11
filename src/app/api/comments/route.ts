@@ -5,7 +5,7 @@ import { addComment } from "@/lib/store";
 export async function POST(request: Request) {
   try {
     const payload = commentSchema.parse(await parseJson(request));
-    return apiOk({ comment: addComment(payload.characterId, payload.content, payload.userId) });
+    return apiOk({ comment: await addComment(payload.characterId, payload.content, payload.userId) });
   } catch (error) {
     return handleApiError(error);
   }

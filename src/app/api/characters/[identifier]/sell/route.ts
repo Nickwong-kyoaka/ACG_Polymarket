@@ -9,7 +9,8 @@ export async function POST(
   try {
     const payload = tradeSchema.parse(await parseJson(request));
     const { identifier } = await params;
-    return apiOk(sellSupport(identifier, payload.quantity, payload.userId));
+    const idempotencyKey = payload.idempotencyKey ?? request.headers.get("idempotency-key") ?? undefined;
+    return apiOk(await sellSupport(identifier, payload.quantity, payload.userId, idempotencyKey));
   } catch (error) {
     return handleApiError(error);
   }

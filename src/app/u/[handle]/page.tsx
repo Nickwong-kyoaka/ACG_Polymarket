@@ -11,7 +11,7 @@ export default async function PublicProfilePage({
   params: Promise<{ handle: string }>;
 }) {
   const { handle } = await params;
-  const { profile, positions, wallet } = getUserByHandle(handle);
+  const { profile, positions, wallet } = await getUserByHandle(handle);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12">
@@ -55,7 +55,7 @@ export default async function PublicProfilePage({
             </p>
             <h3 className="mt-3 font-display text-3xl text-slate-950">{position.character.name}</h3>
             <p className="mt-4 text-sm leading-7 text-slate-600">
-              Holding {position.units} units · avg cost {position.averageCost} SUP · current value{" "}
+              Holding {position.units} units - avg cost {position.averageCost} SUP - current value{" "}
               {currencyLabel(position.currentValue)}
             </p>
           </Surface>

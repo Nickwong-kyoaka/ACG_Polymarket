@@ -20,25 +20,39 @@ export function SupportTradePanel({
   const router = useRouter();
   const [quantity, setQuantity] = useState(1);
   const [status, setStatus] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [pending, startTransition] = useTransition();
 
   async function submit(side: "buy" | "sell") {
-    setStatus(null);
-    const response = await fetch(`/api/characters/${characterId}/${side}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quantity }),
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      setStatus(payload.error ?? "Trade failed.");
+    if (submitting) {
       return;
     }
 
-    setStatus(side === "buy" ? "Support units added." : "Support units sold back.");
-    startTransition(() => router.refresh());
+    setStatus(null);
+    setSubmitting(true);
+    const idempotencyKey = crypto.randomUUID();
+
+    try {
+      const response = await fetch(`/api/characters/${characterId}/${side}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ quantity, idempotencyKey }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setStatus(payload.error ?? "Trade failed.");
+        return;
+      }
+
+      setStatus(side === "buy" ? "Support units added." : "Support units sold back.");
+      startTransition(() => router.refresh());
+    } finally {
+      setSubmitting(false);
+    }
   }
+
+  const busy = submitting || pending;
 
   return (
     <div className="rounded-[2rem] border border-black/10 bg-white p-6 shadow-[0_25px_60px_-40px_rgba(15,23,42,0.5)]">
@@ -77,7 +91,7 @@ export function SupportTradePanel({
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            disabled={pending}
+            disabled={busy}
             onClick={() => submit("buy")}
             className="rounded-full bg-[#db5d35] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#c14a24] disabled:opacity-60"
           >
@@ -85,7 +99,7 @@ export function SupportTradePanel({
           </button>
           <button
             type="button"
-            disabled={pending || ownedUnits < quantity}
+            disabled={busy || ownedUnits < quantity}
             onClick={() => submit("sell")}
             className="rounded-full border border-black/10 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#db5d35] hover:text-[#db5d35] disabled:opacity-50"
           >

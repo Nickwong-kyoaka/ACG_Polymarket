@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 const navItems = [
   { href: "/", label: "Discover" },
   { href: "/market", label: "Market" },
+  { href: "/comfort", label: "Comfort" },
   { href: "/me", label: "Me" },
   { href: "/admin", label: "Admin" },
 ];

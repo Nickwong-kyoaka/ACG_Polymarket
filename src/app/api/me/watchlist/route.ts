@@ -1,6 +1,6 @@
 import { apiOk } from "@/lib/api";
 import { getPortfolioView } from "@/lib/store";
 
-export function GET() {
-  return apiOk({ watchlist: getPortfolioView().watchlist });
+export async function GET() {
+  return apiOk({ watchlist: (await getPortfolioView()).watchlist });
 }

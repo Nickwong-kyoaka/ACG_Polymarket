@@ -14,6 +14,11 @@ export type AssetWorkflowStatus =
   | "REVIEWED"
   | "PUBLISHED"
   | "PULLED";
+export type AssetSourceKind =
+  | "AI_GENERATED"
+  | "USER_PROVIDED"
+  | "BANGUMI_METADATA"
+  | "OFFICIAL_REFERENCE";
 export type CurrencyType = "SOFT" | "PREMIUM";
 export type LedgerReferenceType =
   | "STARTER_GRANT"
@@ -136,6 +141,10 @@ export interface CharacterAsset {
   version: number;
   rightsGrantId?: string;
   metadata?: Record<string, string | number | boolean>;
+  sourceKind?: AssetSourceKind;
+  sourceUrl?: string;
+  attributionText?: string;
+  takedownContact?: string;
 }
 
 export interface Character {
@@ -159,6 +168,10 @@ export interface Character {
   accentFrom: string;
   accentTo: string;
   relatedCharacterIds: string[];
+  releaseSeason?: string;
+  sourceTitle?: string;
+  favoritePhrase?: string;
+  externalScores?: ExternalScoreSnapshot[];
   attributeValues: CharacterAttributeValue[];
   assetIds: string[];
   rightsGrantIds: string[];
@@ -296,6 +309,48 @@ export interface SeedSnapshot {
   shopCollections: ShopCollection[];
   shopItems: ShopItem[];
   inventoryItems: InventoryItem[];
+  comfortModes: ComfortMode[];
+  comfortContents: ComfortContent[];
+}
+
+export interface ExternalScoreSnapshot {
+  source: "Bangumi" | "AniList" | "MyAnimeList" | "Anime-Planet" | string;
+  score?: number;
+  rank?: number;
+  popularity?: number;
+  favorites?: number;
+  sourceUrl?: string;
+  capturedAt?: string;
+}
+
+export interface ComfortMode {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  promptLabel: string;
+  accentFrom: string;
+  accentTo: string;
+  sortOrder: number;
+}
+
+export interface ComfortContent {
+  id: string;
+  modeId: string;
+  characterId?: string;
+  kind: "SWEET_TALK" | "ASMR" | "VOICE" | "COMIC" | "WALLPAPER";
+  title: string;
+  body: string;
+  mediaUrl?: string;
+  sweetnessLevel: number;
+  unlockShopItemId?: string;
+  published: boolean;
+  metadata?: Record<string, string | number | boolean>;
+}
+
+export interface ComfortModeView extends ComfortMode {
+  contents: Array<ComfortContent & { character?: Character }>;
 }
 
 export interface CharacterView {

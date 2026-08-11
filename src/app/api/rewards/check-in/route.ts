@@ -3,7 +3,7 @@ import { claimDailyReward } from "@/lib/store";
 
 export async function POST() {
   try {
-    return apiOk(claimDailyReward());
+    return apiOk(await claimDailyReward());
   } catch (error) {
     return handleApiError(error);
   }

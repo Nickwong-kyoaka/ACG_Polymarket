@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { identifier } = await params;
-    return apiOk({ item: getCharacterView(identifier) });
+    return apiOk({ item: await getCharacterView(identifier) });
   } catch (error) {
     return handleApiError(error);
   }

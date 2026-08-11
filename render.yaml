@@ -6,10 +6,8 @@ services:
     region: singapore
     branch: main
     autoDeployTrigger: checksPass
-    buildCommand: npm ci && npm run prisma:generate && npm run build
-    preDeployCommand: npm run db:push
+    buildCommand: npm ci && npm run prisma:generate && npm run db:push && npm run db:seed && npm run build
     startCommand: npm run start -- -H 0.0.0.0 -p $PORT
-    initialDeployHook: npm run db:seed
     healthCheckPath: /
     envVars:
       - key: NODE_VERSION

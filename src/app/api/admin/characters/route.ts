@@ -5,7 +5,7 @@ import { createAdminCharacter } from "@/lib/store";
 export async function POST(request: Request) {
   try {
     const payload = adminCharacterSchema.parse(await parseJson(request));
-    return apiOk({ character: createAdminCharacter(payload) });
+    return apiOk({ character: await createAdminCharacter(payload) });
   } catch (error) {
     return handleApiError(error);
   }

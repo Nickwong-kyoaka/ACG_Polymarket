@@ -14,12 +14,21 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default function Home() {
-  const featuredCharacters = listCharacters({ featuredOnly: true });
-  const recentTrades = getRecentTrades();
-  const shopItems = getShopItems().slice(0, 2);
-  const watchlistIds = getWatchlistIds();
-  const { wallet } = getCurrentViewer();
+export default async function Home() {
+  const [featuredCharacters, recentTrades, shopItems, watchlistIds, viewer] = await Promise.all([
+    listCharacters({ featuredOnly: true }),
+    getRecentTrades(),
+    getShopItems(),
+    getWatchlistIds(),
+    getCurrentViewer(),
+  ]);
+  const { wallet } = viewer;
+  const featuredCards = await Promise.all(
+    featuredCharacters.map(async (character) => ({
+      character,
+      commentCount: await getCommentCount(character.id),
+    })),
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-16 px-6 py-10 sm:py-16">
@@ -36,7 +45,7 @@ export default function Home() {
               <p className="max-w-2xl text-lg leading-8 text-slate-600">
                 ACG Support Market turns daily check-ins, positive-only support units, avatar frames,
                 and wallpapers into one soft-currency fandom loop. No shorting. No cash-out. No
-                “my favorite beats yours” copy.
+                rivalry-first copy.
               </p>
             </div>
             <div className="flex flex-wrap gap-4">
@@ -51,6 +60,12 @@ export default function Home() {
                 className="rounded-full border border-black/10 px-6 py-4 text-sm font-semibold text-slate-700 transition hover:border-[#db5d35] hover:text-[#db5d35]"
               >
                 Start onboarding
+              </Link>
+              <Link
+                href="/comfort"
+                className="rounded-full border border-black/10 bg-white/60 px-6 py-4 text-sm font-semibold text-slate-700 transition hover:border-[#db5d35] hover:text-[#db5d35]"
+              >
+                Open comfort room
               </Link>
             </div>
           </div>
@@ -88,12 +103,12 @@ export default function Home() {
           description="Original characters ship with first-party gradients and cosmetic hooks. Metadata-only licensed entries stay clearly labeled and attribution-first."
         />
         <div className="grid gap-6 lg:grid-cols-2">
-          {featuredCharacters.map((character) => (
+          {featuredCards.map(({ character, commentCount }) => (
             <CharacterCard
               key={character.id}
               character={character}
               watching={watchlistIds.includes(character.id)}
-              commentCount={getCommentCount(character.id)}
+              commentCount={commentCount}
             />
           ))}
         </div>
@@ -146,7 +161,7 @@ export default function Home() {
                     {trade.side === "BUY" ? "Supported" : "Sold back"} {trade.character.name}
                   </p>
                   <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
-                    {trade.quantity} unit{trade.quantity > 1 ? "s" : ""} · {trade.unitPrice} SUP
+                    {trade.quantity} unit{trade.quantity > 1 ? "s" : ""} at {trade.unitPrice} SUP
                   </p>
                 </div>
                 <p className="text-sm font-semibold text-slate-600">
@@ -166,7 +181,7 @@ export default function Home() {
           description="The market stays soft-currency only. Ads and cosmetics create the revenue path while character assets stay rights-aware."
         />
         <div className="grid gap-5 lg:grid-cols-2">
-          {shopItems.map((item) => (
+          {shopItems.slice(0, 2).map((item) => (
             <Surface key={item.id} className="p-6">
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#db5d35]">
                 {item.kind.replaceAll("_", " ")}

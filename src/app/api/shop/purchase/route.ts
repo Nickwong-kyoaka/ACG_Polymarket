@@ -5,7 +5,8 @@ import { purchaseShopItem } from "@/lib/store";
 export async function POST(request: Request) {
   try {
     const payload = shopPurchaseSchema.parse(await parseJson(request));
-    return apiOk(purchaseShopItem(payload.itemId, payload.userId, payload.equip));
+    const idempotencyKey = payload.idempotencyKey ?? request.headers.get("idempotency-key") ?? undefined;
+    return apiOk(await purchaseShopItem(payload.itemId, payload.userId, payload.equip, idempotencyKey));
   } catch (error) {
     return handleApiError(error);
   }

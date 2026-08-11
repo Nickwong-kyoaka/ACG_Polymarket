@@ -8,10 +8,12 @@ import { getPortfolioView, getRecentTrades, getShopItems } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-export default function MePage() {
-  const portfolio = getPortfolioView();
-  const recentTrades = getRecentTrades(5);
-  const shopItems = getShopItems();
+export default async function MePage() {
+  const [portfolio, recentTrades, shopItems] = await Promise.all([
+    getPortfolioView(),
+    getRecentTrades(5),
+    getShopItems(),
+  ]);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-12">
@@ -47,7 +49,7 @@ export default function MePage() {
                       {position.character.name}
                     </p>
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      {position.units} units · avg {position.averageCost} SUP
+                      {position.units} units - avg {position.averageCost} SUP
                     </p>
                   </div>
                   <p className="text-sm font-semibold text-slate-600">

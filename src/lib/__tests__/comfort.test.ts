@@ -1,30 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { COMFORT_MODES, matchComfortMode } from "@/lib/comfort";
+import { matchComfortMode } from "@/lib/comfort";
+
+const modes = [
+  { slug: "loneliness" },
+  { slug: "stress" },
+  { slug: "study-fatigue" },
+  { slug: "sleep" },
+  { slug: "low-confidence" },
+  { slug: "heartbreak" },
+];
 
 describe("comfort mode matching", () => {
-  it("keeps the MVP comfort menu stable", () => {
-    expect(COMFORT_MODES.map((mode) => mode.key)).toEqual([
-      "lonely",
-      "stress",
-      "study_fatigue",
-      "sleep",
-      "low_confidence",
-      "heartbreak",
-    ]);
+  it("matches common emotional needs to comfort rooms", () => {
+    expect(matchComfortMode("I feel lonely tonight", modes)).toBe("loneliness");
+    expect(matchComfortMode("exam pressure is too much", modes)).toBe("stress");
+    expect(matchComfortMode("讀書讀到好累", modes)).toBe("study-fatigue");
   });
 
-  it("matches stress language to a grounding comfort mode", () => {
-    const result = matchComfortMode({
-      need: "I feel anxious and overwhelmed before a deadline",
-      tags: ["pressure"],
-    });
-
-    expect(result.mode.key).toBe("stress");
-    expect(result.score).toBeGreaterThan(0);
-    expect(result.matchedKeywords).toEqual(expect.arrayContaining(["anxious", "overwhelmed"]));
-  });
-
-  it("uses late local hours as a sleep hint when no need is provided", () => {
-    expect(matchComfortMode({ localHour: 23 }).mode.key).toBe("sleep");
+  it("falls back to the first available mode", () => {
+    expect(matchComfortMode("just checking the room", modes)).toBe("loneliness");
   });
 });

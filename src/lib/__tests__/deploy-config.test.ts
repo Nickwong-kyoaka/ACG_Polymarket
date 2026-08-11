@@ -11,7 +11,9 @@ describe("Render deployment support", () => {
     expect(renderYaml).toContain("type: web");
     expect(renderYaml).toContain("runtime: node");
     expect(renderYaml).toContain("branch: main");
-    expect(renderYaml).toContain("buildCommand: npm ci && npm run prisma:generate && npm run build");
+    expect(renderYaml).toContain(
+      "buildCommand: npm ci && npm run prisma:generate && npm run db:push && npm run db:seed && npm run build",
+    );
     expect(renderYaml).toContain("startCommand: npm run start -- -H 0.0.0.0 -p $PORT");
   });
 

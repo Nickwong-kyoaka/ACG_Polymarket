@@ -5,8 +5,8 @@ import { getAdminSnapshot } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminPage() {
-  const snapshot = getAdminSnapshot();
+export default async function AdminPage() {
+  const snapshot = await getAdminSnapshot();
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-12">
