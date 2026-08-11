@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Surface } from "@/components/ui/surface";
+import { getCopy, hrefWithLocale, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export type ComfortMode = {
@@ -270,7 +271,9 @@ export function getComfortMode(slug: string) {
   return comfortModes.find((mode) => mode.slug === slug);
 }
 
-export function ComfortNotice({ className }: { className?: string }) {
+export function ComfortNotice({ className, locale = "en" }: { className?: string; locale?: Locale }) {
+  const copy = getCopy(locale);
+
   return (
     <div
       className={cn(
@@ -278,13 +281,14 @@ export function ComfortNotice({ className }: { className?: string }) {
         className,
       )}
     >
-      ACG Support Market comfort rooms are fandom entertainment, not therapy, medical care, or
-      crisis support. If you feel unsafe, contact local emergency services or someone you trust now.
+      {copy.comfort.notice}
     </div>
   );
 }
 
-export function ComfortModeCard({ mode }: { mode: ComfortMode }) {
+export function ComfortModeCard({ mode, locale = "en" }: { mode: ComfortMode; locale?: Locale }) {
+  const copy = getCopy(locale);
+
   return (
     <Surface className="group overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_90px_-42px_rgba(15,23,42,0.55)]">
       <div
@@ -303,7 +307,7 @@ export function ComfortModeCard({ mode }: { mode: ComfortMode }) {
             className="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-white"
             style={{ background: mode.colorFrom }}
           >
-            Room
+            {copy.common.room}
           </span>
         </div>
         <p className="text-sm leading-7 text-slate-600">{mode.tagline}</p>
@@ -318,17 +322,25 @@ export function ComfortModeCard({ mode }: { mode: ComfortMode }) {
           ))}
         </div>
         <Link
-          href={`/comfort/${mode.slug}`}
+          href={hrefWithLocale(`/comfort/${mode.slug}`, locale)}
           className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
         >
-          Open {mode.label.toLowerCase()} mode
+          {locale === "cn" ? `打開 ${mode.label}` : `Open ${mode.label.toLowerCase()} mode`}
         </Link>
       </div>
     </Surface>
   );
 }
 
-export function SweetTalkCards({ mode, compact = false }: { mode: ComfortMode; compact?: boolean }) {
+export function SweetTalkCards({
+  mode,
+  compact = false,
+  locale = "en",
+}: {
+  mode: ComfortMode;
+  compact?: boolean;
+  locale?: Locale;
+}) {
   return (
     <div className={cn("grid gap-4", compact ? "" : "sm:grid-cols-3")}>
       {mode.sweetTalk.map((line, index) => (
@@ -341,7 +353,7 @@ export function SweetTalkCards({ mode, compact = false }: { mode: ComfortMode; c
             style={{ background: mode.colorFrom }}
           />
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-            Sweet talk {String(index + 1).padStart(2, "0")}
+            {locale === "cn" ? "情話卡" : "Sweet talk"} {String(index + 1).padStart(2, "0")}
           </p>
           <p className="relative mt-4 text-base leading-8 text-slate-700">{line}</p>
         </div>
@@ -350,7 +362,9 @@ export function SweetTalkCards({ mode, compact = false }: { mode: ComfortMode; c
   );
 }
 
-export function VoicePlayerPlaceholders({ mode }: { mode: ComfortMode }) {
+export function VoicePlayerPlaceholders({ mode, locale = "en" }: { mode: ComfortMode; locale?: Locale }) {
+  const copy = getCopy(locale);
+
   return (
     <div className="grid gap-4">
       {mode.voiceTracks.map((track) => (
@@ -358,7 +372,7 @@ export function VoicePlayerPlaceholders({ mode }: { mode: ComfortMode }) {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/50">
-                Voice / ASMR placeholder
+                {locale === "cn" ? "語音 / ASMR 預留位" : "Voice / ASMR placeholder"}
               </p>
               <h3 className="mt-3 font-display text-2xl">{track.title}</h3>
               <p className="mt-2 text-sm text-white/65">
@@ -370,7 +384,7 @@ export function VoicePlayerPlaceholders({ mode }: { mode: ComfortMode }) {
               disabled
               className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/60"
             >
-              Locked
+              {copy.common.locked}
             </button>
           </div>
           <div className="mt-5 grid grid-cols-[auto_1fr_auto] items-center gap-3 text-xs text-white/50">
@@ -389,7 +403,7 @@ export function VoicePlayerPlaceholders({ mode }: { mode: ComfortMode }) {
   );
 }
 
-export function StoryPanelStrip({ mode }: { mode: ComfortMode }) {
+export function StoryPanelStrip({ mode, locale = "en" }: { mode: ComfortMode; locale?: Locale }) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {mode.storyPanels.map((panel, index) => (
@@ -404,7 +418,7 @@ export function StoryPanelStrip({ mode }: { mode: ComfortMode }) {
             }}
           >
             <span className="rounded-full bg-black/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
-              Scene {index + 1}
+              {locale === "cn" ? "場景" : "Scene"} {index + 1}
             </span>
           </div>
           <div className="p-5">
@@ -417,7 +431,7 @@ export function StoryPanelStrip({ mode }: { mode: ComfortMode }) {
   );
 }
 
-export function CharacterSupportCta({ mode }: { mode: ComfortMode }) {
+export function CharacterSupportCta({ mode, locale = "en" }: { mode: ComfortMode; locale?: Locale }) {
   return (
     <Surface className="overflow-hidden">
       <div
@@ -437,27 +451,32 @@ export function CharacterSupportCta({ mode }: { mode: ComfortMode }) {
       </div>
       <div className="grid gap-4 p-6 sm:grid-cols-[1fr_auto] sm:items-center sm:p-8">
         <p className="text-sm leading-7 text-slate-600">
-          Support units stay positive-only. The CTA celebrates a favorite character without putting
-          another fan or character down.
+          {locale === "cn"
+            ? "應援份數維持正向。這個 CTA 是慶祝喜歡的角色，不是踩低其他粉絲或角色。"
+            : "Support units stay positive-only. The CTA celebrates a favorite character without putting another fan or character down."}
         </p>
         <Link
-          href={`/character/${mode.supportCharacter.slug}`}
+          href={hrefWithLocale(`/character/${mode.supportCharacter.slug}`, locale)}
           className="inline-flex items-center justify-center rounded-full bg-[#db5d35] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#c14a24]"
         >
-          Support this character
+          {locale === "cn" ? "支持這個角色" : "Support this character"}
         </Link>
       </div>
     </Surface>
   );
 }
 
-export function RitualChecklist({ mode }: { mode: ComfortMode }) {
+export function RitualChecklist({ mode, locale = "en" }: { mode: ComfortMode; locale?: Locale }) {
   return (
     <Surface className="p-6 sm:p-8">
       <SectionHeading
-        eyebrow="Tiny ritual"
-        title="A three-step comfort loop"
-        description="The loop is intentionally small: feel something, receive something sweet, then express support without conflict."
+        eyebrow={locale === "cn" ? "小儀式" : "Tiny ritual"}
+        title={locale === "cn" ? "三步安慰循環" : "A three-step comfort loop"}
+        description={
+          locale === "cn"
+            ? "循環刻意做得很小：感受一下、收下一句甜話，再用不對立的方式表達支持。"
+            : "The loop is intentionally small: feel something, receive something sweet, then express support without conflict."
+        }
       />
       <div className="mt-8 grid gap-3">
         {mode.ritual.map((step, index) => (
@@ -476,13 +495,17 @@ export function RitualChecklist({ mode }: { mode: ComfortMode }) {
   );
 }
 
-export function UnlockPreview({ mode }: { mode: ComfortMode }) {
+export function UnlockPreview({ mode, locale = "en" }: { mode: ComfortMode; locale?: Locale }) {
   return (
     <Surface className="p-6 sm:p-8">
       <SectionHeading
-        eyebrow="Unlocks"
-        title="Cosmetics for affection, not advantage"
-        description="These are frontend placeholders for future shop items: avatar frames, profile skins, wallpapers, and comic drops."
+        eyebrow={locale === "cn" ? "解鎖物" : "Unlocks"}
+        title={locale === "cn" ? "為喜歡而存在的外觀，不是戰力" : "Cosmetics for affection, not advantage"}
+        description={
+          locale === "cn"
+            ? "這些是未來商店物品的前端預留位：頭像框、個人頁皮膚、壁紙與漫畫掉落。"
+            : "These are frontend placeholders for future shop items: avatar frames, profile skins, wallpapers, and comic drops."
+        }
       />
       <div className="mt-8 grid gap-4">
         {mode.unlocks.map((unlock) => (
@@ -491,7 +514,7 @@ export function UnlockPreview({ mode }: { mode: ComfortMode }) {
             className="rounded-[1.5rem] border border-dashed border-black/15 bg-white/70 p-5"
           >
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#db5d35]">
-              AI-generated friendly
+              {locale === "cn" ? "AI 生成友善" : "AI-generated friendly"}
             </p>
             <p className="mt-3 text-sm leading-7 text-slate-600">{unlock}</p>
           </div>

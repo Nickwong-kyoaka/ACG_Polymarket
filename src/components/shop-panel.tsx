@@ -2,17 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { getCopy, type Locale } from "@/lib/i18n";
 import { currencyLabel } from "@/lib/utils";
 import type { InventoryItem, ShopItem } from "@/lib/types";
 
 export function ShopPanel({
   items,
   inventory,
+  locale = "en",
 }: {
   items: ShopItem[];
   inventory: Array<InventoryItem & { item: ShopItem }>;
+  locale?: Locale;
 }) {
   const router = useRouter();
+  const copy = getCopy(locale);
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -35,11 +39,11 @@ export function ShopPanel({
       const payload = await response.json();
 
       if (!response.ok) {
-        setStatus(payload.error ?? "Purchase failed.");
+        setStatus(payload.error ?? copy.shop.failed);
         return;
       }
 
-      setStatus("Cosmetic unlocked and equipped.");
+      setStatus(copy.shop.done);
       startTransition(() => router.refresh());
     } finally {
       setSubmitting(false);
@@ -57,12 +61,12 @@ export function ShopPanel({
           return (
             <div
               key={item.id}
-              className="rounded-[2rem] border border-black/10 bg-white p-5 shadow-[0_20px_80px_-40px_rgba(15,23,42,0.45)]"
+              className="manga-panel rounded-[2rem] bg-white/92 p-5"
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#db5d35]">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#ff3d7f]">
                 {item.kind.replaceAll("_", " ")}
               </p>
-              <h3 className="mt-3 font-display text-3xl text-slate-950">{item.title}</h3>
+              <h3 className="mt-3 font-display text-3xl text-[#171126]">{item.title}</h3>
               <p className="mt-3 text-sm leading-7 text-slate-600">{item.description}</p>
               <div className="mt-4 flex items-center justify-between">
                 <p className="text-lg font-semibold text-slate-950">{currencyLabel(item.price)}</p>
@@ -70,9 +74,9 @@ export function ShopPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => purchase(item.id)}
-                  className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                  className="rounded-full bg-[#171126] px-4 py-2 text-sm font-black text-white transition hover:bg-[#ff3d7f] disabled:opacity-60"
                 >
-                  {owned ? (owned.equipped ? "Equipped" : "Equip again") : "Unlock"}
+                  {owned ? (owned.equipped ? copy.shop.equipped : copy.shop.equipAgain) : copy.shop.unlock}
                 </button>
               </div>
             </div>

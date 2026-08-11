@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { REACTION_LABELS } from "@/lib/constants";
+import { getCopy, type Locale } from "@/lib/i18n";
 import { formatRelativeDate } from "@/lib/time";
 
 type CommentItem = {
@@ -19,12 +20,15 @@ export function CommentPanel({
   characterId,
   comments,
   reactions,
+  locale = "en",
 }: {
   characterId: string;
   comments: CommentItem[];
   reactions: Record<string, number>;
+  locale?: Locale;
 }) {
   const router = useRouter();
+  const copy = getCopy(locale);
   const [content, setContent] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -38,12 +42,12 @@ export function CommentPanel({
     const payload = await response.json();
 
     if (!response.ok) {
-      setStatus(payload.error ?? "Unable to post comment.");
+      setStatus(payload.error ?? copy.comments.failed);
       return;
     }
 
     setContent("");
-    setStatus("Comment posted.");
+    setStatus(copy.comments.posted);
     startTransition(() => router.refresh());
   }
 
@@ -56,7 +60,7 @@ export function CommentPanel({
     const payload = await response.json();
 
     if (!response.ok) {
-      setStatus(payload.error ?? "Unable to react.");
+      setStatus(payload.error ?? copy.comments.reactFailed);
       return;
     }
 
@@ -65,14 +69,14 @@ export function CommentPanel({
   }
 
   return (
-    <div className="grid gap-5 rounded-[2rem] border border-black/10 bg-white p-6 shadow-[0_20px_80px_-40px_rgba(15,23,42,0.5)]">
+    <div className="manga-panel grid gap-5 rounded-[2rem] bg-white/92 p-6">
       <div className="flex flex-wrap gap-3">
         {(["CHEER", "HEART", "HYPE"] as const).map((kind) => (
           <button
             key={kind}
             type="button"
             onClick={() => react(kind)}
-            className="rounded-full border border-black/10 bg-[#fff8ef] px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-[#db5d35] hover:text-[#db5d35]"
+            className="rounded-full border border-black/10 bg-[#fff8ed] px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-[#ff3d7f] hover:text-[#ff3d7f]"
           >
             {REACTION_LABELS[kind]} · {reactions[kind] ?? 0}
           </button>
@@ -84,16 +88,16 @@ export function CommentPanel({
           rows={4}
           value={content}
           onChange={(event) => setContent(event.target.value)}
-          placeholder="Share what you love about this character."
-          className="rounded-[1.5rem] border border-black/10 bg-[#fff9f2] px-4 py-3 text-slate-900 outline-none ring-[#db5d35] transition focus:ring-2"
+          placeholder={copy.comments.placeholder}
+          className="rounded-[1.5rem] border border-black/10 bg-[#fff8ed] px-4 py-3 text-slate-900 outline-none ring-[#ff3d7f] transition focus:ring-2"
         />
         <button
           type="button"
           disabled={pending || content.trim().length < 3}
           onClick={addComment}
-          className="justify-self-start rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+          className="justify-self-start rounded-full bg-[#171126] px-5 py-3 text-sm font-black text-white transition hover:bg-[#ff3d7f] disabled:opacity-50"
         >
-          Post appreciation
+          {copy.comments.post}
         </button>
         {status ? <p className="text-sm font-medium text-slate-600">{status}</p> : null}
       </div>
@@ -103,9 +107,9 @@ export function CommentPanel({
           <div key={comment.id} className="rounded-[1.5rem] border border-black/10 bg-[#fffdf9] p-4">
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm font-semibold text-slate-950">
-                {comment.author?.displayName ?? "Supporter"}
+                {comment.author?.displayName ?? copy.comments.supporter}
                 <span className="ml-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                  @{comment.author?.handle ?? "guest"}
+                  @{comment.author?.handle ?? copy.comments.guest}
                 </span>
               </p>
               <p className="text-xs uppercase tracking-[0.18em] text-slate-400">

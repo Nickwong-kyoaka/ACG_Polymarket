@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { getCopy, type Locale } from "@/lib/i18n";
 
-export function RewardClaimPanel() {
+export function RewardClaimPanel({ locale = "en" }: { locale?: Locale }) {
   const router = useRouter();
+  const copy = getCopy(locale);
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -26,14 +28,14 @@ export function RewardClaimPanel() {
       const payload = await response.json();
 
       if (!response.ok) {
-        setStatus(payload.error ?? "Reward claim failed.");
+        setStatus(payload.error ?? copy.rewards.failed);
         return;
       }
 
       setStatus(
         endpoint === "/api/rewards/check-in"
-          ? "Daily reward claimed."
-          : "Rewarded ad payout received.",
+          ? copy.rewards.dailyDone
+          : copy.rewards.adDone,
       );
       startTransition(() => router.refresh());
     } finally {
@@ -44,26 +46,26 @@ export function RewardClaimPanel() {
   const busy = submitting || pending;
 
   return (
-    <div className="grid gap-3 rounded-[1.75rem] border border-black/10 bg-[#fff9f2] p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-        Reward loop
+    <div className="grid gap-3 rounded-[1.75rem] border border-black/10 bg-[#fff8ed] p-5">
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+        {copy.rewards.loop}
       </p>
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
           disabled={busy}
           onClick={() => claim("/api/rewards/check-in")}
-          className="rounded-full bg-[#db5d35] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#c14a24] disabled:opacity-60"
+          className="rounded-full bg-[#ff3d7f] px-4 py-3 text-sm font-black text-white transition hover:bg-[#e32369] disabled:opacity-60"
         >
-          Claim daily check-in
+          {copy.rewards.daily}
         </button>
         <button
           type="button"
           disabled={busy}
           onClick={() => claim("/api/rewards/ad-claim")}
-          className="rounded-full border border-black/10 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#db5d35] hover:text-[#db5d35] disabled:opacity-60"
+          className="rounded-full border border-black/10 px-4 py-3 text-sm font-black text-slate-700 transition hover:border-[#ff3d7f] hover:text-[#ff3d7f] disabled:opacity-60"
         >
-          Claim ad reward
+          {copy.rewards.ad}
         </button>
       </div>
       {status ? <p className="text-sm font-medium text-slate-600">{status}</p> : null}

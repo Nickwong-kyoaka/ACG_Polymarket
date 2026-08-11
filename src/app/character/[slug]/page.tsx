@@ -3,6 +3,8 @@ import { SupportTradePanel } from "@/components/support-trade-panel";
 import { Badge } from "@/components/ui/badge";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Surface } from "@/components/ui/surface";
+import { getCopy } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/request-locale";
 import { getCharacterView, getPortfolioView, getReactionSummary } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,8 @@ export default async function CharacterPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  const locale = await getRequestLocale();
+  const copy = getCopy(locale);
   const { slug } = await params;
   const view = await getCharacterView(slug);
   const portfolio = await getPortfolioView();
@@ -21,20 +25,23 @@ export default async function CharacterPage({
   const reactions = await getReactionSummary(view.character.id);
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-12">
+    <div className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-12">
       <section
-        className="overflow-hidden rounded-[2.5rem] border border-black/10"
+        className="manga-panel shine-sweep overflow-hidden rounded-[2.8rem]"
         style={{
           background: `linear-gradient(135deg, ${view.character.accentFrom}, ${view.character.accentTo})`,
         }}
       >
-        <div className="grid gap-8 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.04))] px-8 py-10 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="relative grid gap-8 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.05))] px-6 py-10 sm:px-8 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="halftone pointer-events-none absolute inset-0 opacity-25" />
           <div className="space-y-6 text-white">
             <div className="flex flex-wrap gap-3">
               <Badge tone={view.character.rightsType === "ORIGINAL" ? "warm" : "cool"}>
-                {view.character.rightsType}
+                {view.character.rightsType === "ORIGINAL"
+                  ? copy.common.originalIp
+                  : copy.common.licensedMetadata}
               </Badge>
-              {view.character.metadataOnly ? <Badge>Metadata only</Badge> : null}
+              {view.character.metadataOnly ? <Badge>{copy.common.metadataOnly}</Badge> : null}
             </div>
             <div className="space-y-4">
               <h1 className="font-display text-5xl leading-none sm:text-6xl">
@@ -48,6 +55,11 @@ export default async function CharacterPage({
             <p className="max-w-2xl rounded-[1.5rem] bg-black/15 px-5 py-4 text-sm leading-7 text-white/85">
               {view.character.fandomPrompt}
             </p>
+            {view.character.favoritePhrase ? (
+              <p className="max-w-xl rounded-[1.5rem] border border-white/20 bg-white/18 px-5 py-4 text-base font-semibold leading-8 text-white">
+                &ldquo;{view.character.favoritePhrase}&rdquo;
+              </p>
+            ) : null}
           </div>
 
           <SupportTradePanel
@@ -56,6 +68,7 @@ export default async function CharacterPage({
             sellQuote={view.sellQuote}
             balance={portfolio.wallet.softBalance}
             ownedUnits={ownedPosition?.units ?? 0}
+            locale={locale}
           />
         </div>
       </section>
@@ -63,9 +76,9 @@ export default async function CharacterPage({
       <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
         <Surface className="p-6 sm:p-8">
           <SectionHeading
-            eyebrow="Attribute table"
-            title="Roleplay, market context, and source policy in one panel"
-            description="This table is intentionally flexible so original characters and licensed metadata entries can share the same layout without hardcoding fields."
+            eyebrow={copy.character.attributeEyebrow}
+            title={copy.character.attributeTitle}
+            description={copy.character.attributeDescription}
           />
           <div className="mt-8 grid gap-3">
             {view.attributes.map((attribute) => (
@@ -84,9 +97,9 @@ export default async function CharacterPage({
 
         <Surface className="p-6 sm:p-8">
           <SectionHeading
-            eyebrow="Rights and provenance"
-            title="Assets and imported text stay traceable"
-            description="Published assets must point to a rights grant. Imported Bangumi-compatible text preserves source, license, and attribution markers."
+            eyebrow={copy.character.rightsEyebrow}
+            title={copy.character.rightsTitle}
+            description={copy.character.rightsDescription}
           />
           <div className="mt-8 grid gap-4">
             {view.rightsGrants.map((grant) => (
@@ -95,25 +108,26 @@ export default async function CharacterPage({
                   {grant.licensor}
                 </p>
                 <p className="mt-3 text-sm leading-7 text-slate-600">
-                  Contract: {grant.contractReference}
+                  {copy.character.contract}: {grant.contractReference}
                   <br />
-                  Allowed uses: {grant.allowedUseTypes.join(", ")}
+                  {copy.character.allowedUses}: {grant.allowedUseTypes.join(", ")}
                   <br />
-                  Commercial use: {grant.commercialUse ? "Yes" : "No"}
+                  {copy.character.commercialUse}:{" "}
+                  {grant.commercialUse ? copy.common.yes : copy.common.no}
                 </p>
               </div>
             ))}
             {view.sourceAttribution ? (
               <div className="rounded-[1.5rem] border border-dashed border-black/15 p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                  Source attribution
+                  {copy.character.sourceAttribution}
                 </p>
                 <p className="mt-3 text-sm leading-7 text-slate-600">
                   {view.sourceAttribution.attributionText}
                   <br />
                   License: {view.sourceAttribution.licenseName}
                   <br />
-                  Source URL: {view.sourceAttribution.sourceUrl}
+                  URL: {view.sourceAttribution.sourceUrl}
                 </p>
               </div>
             ) : null}
@@ -123,6 +137,7 @@ export default async function CharacterPage({
 
       <CommentPanel
         characterId={view.character.id}
+        locale={locale}
         comments={view.comments.map((comment) => ({
           ...comment,
           author: comment.author

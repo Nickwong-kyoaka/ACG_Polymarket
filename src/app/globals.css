@@ -1,15 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fff8ef;
-  --foreground: #0f172a;
+  --background: #fff4e8;
+  --foreground: #171126;
+  --ink: #171126;
+  --berry: #ff3d7f;
+  --orange: #ff8a3d;
+  --lemon: #ffe56b;
+  --cyan: #38c7ff;
+  --violet: #7c5cff;
+  --cream: #fff8ed;
+  --paper: rgba(255, 253, 247, 0.9);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Aptos", "Segoe UI", "Helvetica Neue", sans-serif;
-  --font-display: "Baskerville", "Palatino Linotype", "Times New Roman", serif;
+  --font-sans: "M PLUS Rounded 1c", "Yu Gothic", "Microsoft JhengHei", "Trebuchet MS", sans-serif;
+  --font-display: "Cooper Black", "Bodoni 72", "Yu Mincho", "Georgia", serif;
 }
 
 * {
@@ -23,7 +31,7 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Aptos", "Segoe UI", "Helvetica Neue", sans-serif;
+  font-family: "M PLUS Rounded 1c", "Yu Gothic", "Microsoft JhengHei", "Trebuchet MS", sans-serif;
 }
 
 a {
@@ -32,12 +40,152 @@ a {
 }
 
 .font-display {
-  font-family: "Baskerville", "Palatino Linotype", "Times New Roman", serif;
+  font-family: "Cooper Black", "Bodoni 72", "Yu Mincho", "Georgia", serif;
 }
 
 .hero-grid {
   background-image:
-    linear-gradient(rgba(15, 23, 42, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.07) 1px, transparent 1px);
-  background-size: 28px 28px;
+    linear-gradient(rgba(23, 17, 38, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 17, 38, 0.08) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.acg-page-shell {
+  background:
+    linear-gradient(120deg, rgba(255, 229, 107, 0.42), transparent 28%),
+    linear-gradient(240deg, rgba(56, 199, 255, 0.32), transparent 32%),
+    linear-gradient(180deg, #fff4e8 0%, #fffaf4 48%, #ffe6f0 100%);
+}
+
+.sparkle-field {
+  background-image:
+    radial-gradient(circle, rgba(255, 61, 127, 0.28) 0 2px, transparent 2.5px),
+    radial-gradient(circle, rgba(56, 199, 255, 0.18) 0 1.5px, transparent 2px),
+    radial-gradient(circle, rgba(255, 229, 107, 0.26) 0 1.5px, transparent 2px);
+  background-position:
+    22px 34px,
+    72px 120px,
+    140px 54px;
+  background-size:
+    180px 180px,
+    220px 220px,
+    260px 260px;
+  mask-image: linear-gradient(180deg, black, transparent 86%);
+}
+
+.halftone {
+  background-image: radial-gradient(circle, rgba(23, 17, 38, 0.14) 1px, transparent 1.5px);
+  background-size: 10px 10px;
+}
+
+.manga-panel {
+  position: relative;
+  border: 2px solid rgba(23, 17, 38, 0.13);
+  box-shadow:
+    0 26px 70px -42px rgba(23, 17, 38, 0.58),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.manga-panel::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+  border-radius: inherit;
+  border: 1px dashed rgba(23, 17, 38, 0.13);
+}
+
+.sticker-shadow {
+  box-shadow:
+    0 18px 0 -10px rgba(23, 17, 38, 0.08),
+    0 34px 80px -52px rgba(23, 17, 38, 0.65);
+}
+
+.anime-portrait-stage {
+  position: relative;
+  overflow: hidden;
+  min-height: 220px;
+}
+
+.anime-portrait-stage::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 22px;
+  width: min(42vw, 230px);
+  height: min(46vw, 260px);
+  transform: translateX(-50%);
+  border-radius: 999px 999px 36px 36px;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.95) 0 18%, transparent 19%),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.22));
+  clip-path: polygon(50% 0, 67% 18%, 84% 31%, 76% 100%, 24% 100%, 15% 31%, 33% 18%);
+  filter: drop-shadow(0 26px 32px rgba(23, 17, 38, 0.22));
+}
+
+.anime-portrait-stage::after {
+  content: "";
+  position: absolute;
+  inset: auto 24px 22px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(23, 17, 38, 0.17);
+  filter: blur(8px);
+}
+
+.shine-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine-sweep::after {
+  content: "";
+  position: absolute;
+  inset: -80% auto -80% -35%;
+  width: 34%;
+  transform: rotate(18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.52), transparent);
+  animation: shine-sweep 5.5s ease-in-out infinite;
+}
+
+@keyframes shine-sweep {
+  0%,
+  58% {
+    translate: 0 0;
+    opacity: 0;
+  }
+  66% {
+    opacity: 1;
+  }
+  100% {
+    translate: 440% 0;
+    opacity: 0;
+  }
+}
+
+.float-soft {
+  animation: float-soft 6s ease-in-out infinite;
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+}
+
+.lang-switch {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 246, 222, 0.88)),
+    radial-gradient(circle at top left, rgba(255, 61, 127, 0.18), transparent 38%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shine-sweep::after,
+  .float-soft {
+    animation: none;
+  }
 }

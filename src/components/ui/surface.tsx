@@ -10,7 +10,7 @@ export function Surface({
   return (
     <div
       className={cn(
-        "rounded-[2rem] border border-black/10 bg-white/90 shadow-[0_20px_80px_-40px_rgba(15,23,42,0.45)] backdrop-blur",
+        "manga-panel rounded-[2rem] bg-white/90 shadow-[0_22px_80px_-44px_rgba(23,17,38,0.52)] backdrop-blur-xl",
         className,
       )}
     >
