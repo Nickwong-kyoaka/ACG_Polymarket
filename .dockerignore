@@ -1,0 +1,9 @@
+.git
+.next
+coverage
+node_modules
+npm-debug.log
+Dockerfile.local
+.env
+.env*.local
+tsconfig.tsbuildinfo

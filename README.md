@@ -32,7 +32,42 @@ This MVP is intentionally **positive-only**:
 - `/admin` official-only publishing and Bangumi-aware import tools
 - `/admin/content`, `/admin/imports`, `/admin/assets`, `/admin/shop` beta content operations
 
-## Local setup
+## Local setup with Docker
+
+This path runs both the Next.js app and PostgreSQL in Docker.
+
+1. Build and start the stack:
+
+```bash
+docker compose up --build
+```
+
+2. Open the app:
+
+```text
+http://localhost:3000
+http://localhost:3000/?lang=cn
+http://localhost:3000/market?lang=cn
+http://localhost:3000/comfort
+http://localhost:3000/me
+```
+
+3. Stop the stack:
+
+```bash
+docker compose down
+```
+
+4. Reset the local Docker database when you want a clean seed:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+The Docker app service runs `prisma generate`, `prisma db push`, `prisma seed`, then starts `next dev` on `0.0.0.0:3000`.
+
+## Local setup without Docker app
 
 1. Install dependencies:
 
@@ -46,10 +81,10 @@ npm install
 cp .env.example .env
 ```
 
-3. Start local Postgres:
+3. Start only local Postgres:
 
 ```bash
-docker compose up -d
+docker compose up -d postgres
 ```
 
 4. Generate Prisma client:
@@ -58,7 +93,14 @@ docker compose up -d
 npm run prisma:generate
 ```
 
-5. Start the app:
+5. Sync and seed the database:
+
+```bash
+npm run db:push
+npm run db:seed
+```
+
+6. Start the app:
 
 ```bash
 npm run dev
