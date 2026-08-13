@@ -199,7 +199,7 @@ button:disabled { cursor: not-allowed; }
 @media (min-width: 1280px) {
   .exchange-page { padding-inline: 2.5rem; }
 }
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .mobile-bottom-nav { display: grid; }
 }
 @media (max-width: 639px) {

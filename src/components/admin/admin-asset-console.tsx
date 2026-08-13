@@ -33,8 +33,11 @@ const workflow: AssetWorkflowStatus[] = [
 ];
 
 const sourceKinds: AssetSourceKind[] = [
+  "PLATFORM_ORIGINAL",
   "AI_GENERATED",
   "USER_PROVIDED",
+  "FAN_ART",
+  "OPEN_LICENSE",
   "BANGUMI_METADATA",
   "OFFICIAL_REFERENCE",
 ];
@@ -109,6 +112,7 @@ function AssetIntake({
         label: String(data.get("label")),
         storageKey: String(data.get("storageKey")),
         altText: String(data.get("altText")),
+        zhAltText: String(data.get("zhAltText")),
         workflowStatus: status,
         rightsGrantId: rightsGrantId || undefined,
         sourceKind,
@@ -122,6 +126,15 @@ function AssetIntake({
         byteSize: Number(data.get("byteSize")) || undefined,
         aiPrompt: aiPrompt || undefined,
         aiModel: aiModel || undefined,
+        permissionStatus: String(data.get("permissionStatus")),
+        contentRating: String(data.get("contentRating")),
+        creatorName: emptyAsUndefined(data.get("creatorName")),
+        creatorUrl: emptyAsUndefined(data.get("creatorUrl")),
+        licenseUrl: emptyAsUndefined(data.get("licenseUrl")),
+        permissionEvidence: emptyAsUndefined(data.get("permissionEvidence")),
+        retrievedAt: emptyAsUndefined(data.get("retrievedAt")) ? new Date(String(data.get("retrievedAt"))).toISOString() : undefined,
+        riskAcknowledged: data.get("riskAcknowledged") === "true",
+        primaryPriority: Number(data.get("primaryPriority")) || 0,
       });
       form.reset();
       setSourceKind("AI_GENERATED");
@@ -184,6 +197,13 @@ function AssetIntake({
           <AdminField label="Source label" hint="Creator, model, or archive">
             <input name="sourceLabel" className={adminInputClass} placeholder="Studio original / Bangumi / model name" />
           </AdminField>
+          <AdminField label="Permission status" required><select name="permissionStatus" className={adminInputClass} defaultValue="UNVERIFIED"><option value="UNVERIFIED">Unverified</option><option value="CREATOR_GRANTED">Creator granted</option><option value="VERIFIED">Verified</option><option value="REJECTED">Rejected</option></select></AdminField>
+          <AdminField label="Content review" required><select name="contentRating" className={adminInputClass} defaultValue="SFW"><option value="SFW">Strict SFW</option><option value="UNRATED">Not reviewed</option><option value="SUGGESTIVE">Suggestive (cannot publish)</option><option value="NSFW">NSFW (cannot publish)</option></select></AdminField>
+          <AdminField label="Creator name"><input name="creatorName" className={adminInputClass} /></AdminField>
+          <AdminField label="Creator URL"><input name="creatorUrl" type="url" className={adminInputClass} /></AdminField>
+          <AdminField label="License URL"><input name="licenseUrl" type="url" className={adminInputClass} /></AdminField>
+          <AdminField label="Retrieved at"><input name="retrievedAt" type="datetime-local" className={adminInputClass} /></AdminField>
+          <AdminField label="Primary priority"><input name="primaryPriority" type="number" min={0} max={1000} defaultValue={0} className={adminInputClass} /></AdminField>
           <AdminField label="Workflow state" hint="Every asset begins at intake" required>
             <input value="UPLOADED" readOnly className={adminInputClass} />
           </AdminField>
@@ -217,6 +237,8 @@ function AssetIntake({
         <AdminField label="Accessible alt text" hint="Minimum 8 characters" required>
           <textarea name="altText" rows={3} minLength={8} className={adminInputClass} required />
         </AdminField>
+        <AdminField label="Traditional Chinese alt text" hint="Required before publication" required><textarea name="zhAltText" rows={3} minLength={4} className={adminInputClass} required /></AdminField>
+        <AdminField label="Permission evidence / review note"><textarea name="permissionEvidence" rows={3} className={adminInputClass} /></AdminField>
         <AdminField
           label="Attribution statement"
           hint={sourceKind === "BANGUMI_METADATA" ? "Required" : "Recommended"}
@@ -239,6 +261,7 @@ function AssetIntake({
             </AdminField>
           </div>
         ) : null}
+        <label className="flex items-start gap-3 rounded-xl bg-amber-50 p-4 text-xs font-bold leading-6 text-amber-900"><input name="riskAcknowledged" value="true" type="checkbox" className="mt-1" />I acknowledge the source risk. This is required before an unverified asset can be published, and real ads remain disabled on its pages.</label>
         <div className="rounded-[1.5rem] border border-[#171126]/10 bg-[#fff8ed] p-5">
           <div className="flex items-center gap-2 text-sm font-black text-[#171126]"><ShieldCheck className="h-5 w-5 text-[#ff3d7f]" /> Release checklist</div>
           <div className="mt-4 grid gap-2 md:grid-cols-2">
@@ -338,6 +361,54 @@ function AssetInventory({ assets }: { assets: CharacterAsset[] }) {
   );
 }
 
+function RemoteMediaImport({ characters }: { characters: Character[] }) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [notice, setNotice] = useState<AdminNotice>(null);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setPending(true);
+    setNotice(null);
+    try {
+      const result = await postAdmin<{ asset: { id: string; workflowStatus: string } }>("/api/admin/assets/import-url", {
+        characterId: String(data.get("characterId")), directMediaUrl: String(data.get("directMediaUrl")), sourcePageUrl: String(data.get("sourcePageUrl")),
+        sourceKind: String(data.get("sourceKind")), permissionStatus: String(data.get("permissionStatus")), creatorName: emptyAsUndefined(data.get("creatorName")), creatorUrl: emptyAsUndefined(data.get("creatorUrl")),
+        licenseName: emptyAsUndefined(data.get("licenseName")), licenseUrl: emptyAsUndefined(data.get("licenseUrl")), permissionEvidence: emptyAsUndefined(data.get("permissionEvidence")),
+        label: String(data.get("label")), altTextEn: String(data.get("altTextEn")), altTextZhHant: String(data.get("altTextZhHant")), riskAcknowledged: data.get("riskAcknowledged") === "true",
+      });
+      setNotice({ tone: "success", message: `Imported ${result.asset.id}. Normalized derivatives are ready for final publication review.` });
+      form.reset();
+      router.refresh();
+    } catch (error) { setNotice({ tone: "error", message: error instanceof Error ? error.message : "Remote media import failed." }); }
+    finally { setPending(false); }
+  }
+
+  return <AdminSectionCard title="Secure URL import" description="Fetch a public HTTPS image, block private-network targets, verify MIME and size, strip metadata, create WebP variants, and upload them to S3. Import never publishes automatically." accent="cyan">
+    <form onSubmit={submit} className="grid gap-5">
+      <div className="grid gap-4 md:grid-cols-2">
+        <AdminField label="Character" required><select name="characterId" required className={adminInputClass} defaultValue=""><option value="" disabled>Select character</option>{characters.map((character) => <option key={character.id} value={character.id}>{character.name}</option>)}</select></AdminField>
+        <AdminField label="Source lane" required><select name="sourceKind" required className={adminInputClass} defaultValue="FAN_ART"><option value="FAN_ART">Fan art</option><option value="OPEN_LICENSE">Open license</option><option value="OFFICIAL_REFERENCE">Official reference</option><option value="USER_PROVIDED">User provided</option></select></AdminField>
+        <AdminField label="Direct image URL" hint="HTTPS only" required><input name="directMediaUrl" type="url" pattern="https://.*" required className={adminInputClass} /></AdminField>
+        <AdminField label="Original source page" hint="Creator or official post" required><input name="sourcePageUrl" type="url" pattern="https://.*" required className={adminInputClass} /></AdminField>
+        <AdminField label="Permission signal" required><select name="permissionStatus" className={adminInputClass} defaultValue="UNVERIFIED"><option value="UNVERIFIED">Unverified</option><option value="CREATOR_GRANTED">Creator granted</option><option value="VERIFIED">Verified</option></select></AdminField>
+        <AdminField label="Creator name"><input name="creatorName" className={adminInputClass} /></AdminField>
+        <AdminField label="Creator URL"><input name="creatorUrl" type="url" className={adminInputClass} /></AdminField>
+        <AdminField label="License name"><input name="licenseName" className={adminInputClass} /></AdminField>
+        <AdminField label="License URL"><input name="licenseUrl" type="url" className={adminInputClass} /></AdminField>
+        <AdminField label="Internal label" required><input name="label" minLength={2} required className={adminInputClass} /></AdminField>
+      </div>
+      <AdminField label="English alt text" required><textarea name="altTextEn" minLength={8} required rows={2} className={adminInputClass} /></AdminField>
+      <AdminField label="Traditional Chinese alt text" required><textarea name="altTextZhHant" minLength={4} required rows={2} className={adminInputClass} /></AdminField>
+      <AdminField label="Permission evidence / review note"><textarea name="permissionEvidence" rows={3} className={adminInputClass} /></AdminField>
+      <label className="flex items-start gap-3 rounded-xl bg-amber-50 p-4 text-xs font-bold leading-6 text-amber-900"><input name="riskAcknowledged" value="true" type="checkbox" required className="mt-1" />I reviewed the source and acknowledge that unverified media disables real ads and may be pulled immediately.</label>
+      <AdminNoticeBar notice={notice} /><AdminSubmitButton pending={pending}>Probe, normalize & upload</AdminSubmitButton>
+    </form>
+  </AdminSectionCard>;
+}
+
 export function AdminAssetConsole({
   assets,
   characters,
@@ -347,5 +418,5 @@ export function AdminAssetConsole({
   characters: Character[];
   rightsGrants: RightsGrant[];
 }) {
-  return <div className="grid gap-7"><AssetIntake characters={characters} rightsGrants={rightsGrants} /><AssetInventory assets={assets} /></div>;
+  return <div className="grid gap-7"><RemoteMediaImport characters={characters} /><AssetIntake characters={characters} rightsGrants={rightsGrants} /><AssetInventory assets={assets} /></div>;
 }

@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowUpRight, Database, FileHeart, Images, ShieldCheck, ShoppingBag, Sparkles, UsersRound } from "lucide-react";
+import { ArrowUpRight, Database, FileHeart, FlagTriangleRight, Images, ShieldAlert, ShieldCheck, ShoppingBag, Sparkles, UsersRound } from "lucide-react";
 import { AdminModerationQueue } from "@/components/admin/admin-moderation-queue";
 import { Badge } from "@/components/ui/badge";
 import { Surface } from "@/components/ui/surface";
 import { getAdminSnapshot } from "@/lib/store";
+import { reconcileMarket } from "@/lib/market-reconciliation";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +13,12 @@ const quickLinks = [
   { href: "/admin/imports", label: "Import metadata", detail: "Bangumi source and attribution ledger", icon: Database, color: "bg-[#e9f7ff] text-[#1659a9]" },
   { href: "/admin/assets", label: "Register asset", detail: "Rights gate and workflow inventory", icon: Images, color: "bg-[#f0ecff] text-[#5b3ebd]" },
   { href: "/admin/shop", label: "Publish cosmetic", detail: "Frames, themes, and wallpapers", icon: ShoppingBag, color: "bg-[#fff2c5] text-[#9c4300]" },
+  { href: "/admin/campaigns", label: "Run campaigns", detail: "Shared goals and milestone rewards", icon: FlagTriangleRight, color: "bg-[#e9f7ff] text-[#1659a9]" },
+  { href: "/admin/takedowns", label: "Protect creators", detail: "Review notices and pull media", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
 ] as const;
 
 export default async function AdminPage() {
-  const snapshot = await getAdminSnapshot();
+  const [snapshot, reconciliation] = await Promise.all([getAdminSnapshot(), reconcileMarket()]);
   const publishedAssets = snapshot.assets.filter((asset) => asset.workflowStatus === "PUBLISHED").length;
   const rightsChecked = snapshot.assets.filter((asset) => ["RIGHTS_CHECKED", "REVIEWED", "PUBLISHED"].includes(asset.workflowStatus)).length;
   const referencedCharacters = snapshot.characters.filter((character) => character.metadataOnly).length;
@@ -38,7 +41,7 @@ export default async function AdminPage() {
         </div>
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {quickLinks.map((item) => {
           const Icon = item.icon;
           return (
@@ -71,6 +74,12 @@ export default async function AdminPage() {
           </div>
         </Surface>
       </div>
+
+      <Surface className="p-6 sm:p-7">
+        <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#ff3d7f]">Market reconciliation</p><h2 className="mt-2 font-display text-3xl text-[#171126]">{reconciliation.ok ? "All ledgers agree" : `${reconciliation.issues.length} integrity issues`}</h2></div><span className={`rounded-full px-4 py-2 text-xs font-black ${reconciliation.ok ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>{reconciliation.ok ? "RECONCILED" : "REVIEW REQUIRED"}</span></div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-4">{Object.entries(reconciliation.summary).map(([label, value]) => <div key={label} className="rounded-2xl bg-[#fff8ed] p-4"><p className="font-display text-3xl">{value}</p><p className="mt-1 text-[10px] font-black uppercase tracking-[.15em] text-slate-400">{label}</p></div>)}</div>
+        {reconciliation.issues.length ? <div className="mt-5 grid gap-2">{reconciliation.issues.slice(0, 12).map((issue) => <p key={`${issue.scope}-${issue.id}-${issue.message}`} className="rounded-xl bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800">{issue.scope} · {issue.id}: {issue.message}</p>)}</div> : null}
+      </Surface>
 
       <Surface className="overflow-hidden p-0">
         <div className="flex flex-col gap-4 border-b border-[#171126]/10 bg-gradient-to-r from-[#fff2c5] to-[#ffe7f0] p-6 sm:flex-row sm:items-center sm:justify-between">

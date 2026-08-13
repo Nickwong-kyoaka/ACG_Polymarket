@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-labelledby="title desc">
+  <title id="title">Sakura signal avatar frame</title><desc id="desc">A transparent coral and gold blossom ring for supporter avatars.</desc>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff4e72"/><stop offset=".55" stop-color="#ff8a45"/><stop offset="1" stop-color="#ffcc66"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="14" stdDeviation="13" flood-color="#8f2947" flood-opacity=".26"/></filter></defs>
+  <circle cx="400" cy="400" r="332" fill="none" stroke="url(#g)" stroke-width="38" filter="url(#s)"/><circle cx="400" cy="400" r="294" fill="none" stroke="#fff8ec" stroke-width="8" stroke-dasharray="7 18"/>
+  <g fill="#ff7896" stroke="#fff8ec" stroke-width="5"><path d="M120 205c-52-42-20-112 37-74 4-66 81-58 70 5 63-21 88 54 26 79 42 48-16 99-58 50-34 56-103 17-69-40-63 6-79-71-6-20z"/><path d="M580 594c-52-42-20-112 37-74 4-66 81-58 70 5 63-21 88 54 26 79 42 48-16 99-58 50-34 56-103 17-69-40-63 6-79-71-6-20z"/></g>
+  <g fill="#ffcc66"><circle cx="169" cy="196" r="18"/><circle cx="629" cy="585" r="18"/></g><text x="400" y="754" text-anchor="middle" fill="#7b3347" font-family="sans-serif" font-size="24" font-weight="800" letter-spacing="6">ACG SUPPORT SIGNAL</text>
+</svg>

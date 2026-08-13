@@ -14,8 +14,6 @@ import { prisma } from "@/lib/prisma";
 import { AuthenticationError, AuthorizationError, AppError } from "@/lib/api";
 import { getOptionalSessionUserId } from "@/lib/auth";
 import {
-  calculateBuyBatchCost,
-  calculateSellBatchReturn,
   getBuyQuote,
   getSellQuote,
 } from "@/lib/market";
@@ -23,6 +21,11 @@ import { getHongKongDayKey } from "@/lib/time";
 import { slugify } from "@/lib/utils";
 import { matchComfortMode } from "@/lib/comfort";
 import { validateAssetSource, validateBangumiAttribution } from "@/lib/content-policy";
+import { verifySignedMarketQuote } from "@/lib/market-quote";
+import { getMarketHistory, type MarketHistoryRange } from "@/lib/market-history";
+import { getPositiveMarketFeed, type MarketFeedOptions } from "@/lib/market-feed";
+import { advanceSupportCampaigns, listSupportCampaigns } from "@/lib/support-campaigns";
+import { listMarketAlerts, triggerMarketAlerts } from "@/lib/market-alerts";
 import type {
   AssetSourceKind,
   AssetWorkflowStatus,
@@ -46,6 +49,7 @@ import type {
   User,
   Wallet,
 } from "@/lib/types";
+import type { DailyMissionView } from "@/lib/types";
 
 type Db = typeof prisma;
 type Tx = Prisma.TransactionClient;
@@ -68,7 +72,7 @@ async function withSerializableRetry<T>(operation: (tx: Tx) => Promise<T>) {
       if (
         attempt === 2 ||
         !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-        error.code !== "P2034"
+        error.code !== "P2034" && error.code !== "P2002"
       ) {
         throw error;
       }
@@ -290,6 +294,7 @@ function toCharacter(record: LooseRecord, locale?: StoreLocale): Character {
     unitsPerStep: asNumber(record.unitsPerStep),
     circulatingUnits: asNumber(record.circulatingUnits),
     supporterCount: asNumber(record.supporterCount),
+    marketVersion: asNumber(record.marketVersion),
     isFeatured: asBoolean(record.isFeatured),
     tags: tagLabels(record.tags),
     accentFrom: asString(record.accentFrom, "#64748b"),
@@ -353,6 +358,21 @@ function toAsset(record: LooseRecord): CharacterAsset {
     byteSize: asNumber(record.byteSize) || undefined,
     aiPrompt: asString(record.aiPrompt) || undefined,
     aiModel: asString(record.aiModel) || undefined,
+    permissionStatus: record.permissionStatus as CharacterAsset["permissionStatus"],
+    contentRating: record.contentRating as CharacterAsset["contentRating"],
+    creatorName: asString(record.creatorName) || undefined,
+    creatorUrl: asString(record.creatorUrl) || undefined,
+    originalMediaUrl: asString(record.originalMediaUrl) || undefined,
+    licenseUrl: asString(record.licenseUrl) || undefined,
+    permissionEvidence: asString(record.permissionEvidence) || undefined,
+    commercialUseAllowed: asBoolean(record.commercialUseAllowed),
+    adaptationAllowed: asBoolean(record.adaptationAllowed),
+    retrievedAt: toIso(record.retrievedAt as Date | string | null | undefined),
+    checksum: asString(record.checksum) || undefined,
+    reviewedAt: toIso(record.reviewedAt as Date | string | null | undefined),
+    reviewNotes: asString(record.reviewNotes) || undefined,
+    riskAcknowledgedAt: toIso(record.riskAcknowledgedAt as Date | string | null | undefined),
+    primaryPriority: asNumber(record.primaryPriority),
   };
 }
 
@@ -502,10 +522,6 @@ function toComfortContent(record: LooseRecord, locale?: StoreLocale): ComfortCon
   };
 }
 
-async function ensureSeeded() {
-  // Seeding is an explicit deploy/local setup step. Public requests never mutate catalog data.
-}
-
 async function getUserId(userId?: string) {
   const activeUserId = userId ?? (await getOptionalSessionUserId());
   if (!activeUserId) {
@@ -556,7 +572,7 @@ async function requireCharacter(
   });
 
   if (!character) {
-    throw new Error("Character not found.");
+    throw new AppError("Character not found.", 404, "CHARACTER_NOT_FOUND");
   }
 
   return character;
@@ -663,7 +679,6 @@ function decodeAdNonce(nonce: string) {
 }
 
 export async function getCurrentViewer() {
-  await ensureSeeded();
   const user = await requireUser();
   const profile = user.profile ?? (await prisma.profile.findUniqueOrThrow({ where: { userId: user.id } }));
   const wallet = user.wallet ?? (await requireWallet(prisma, user.id));
@@ -678,7 +693,6 @@ export async function listCharacters(filters?: {
   featuredOnly?: boolean;
   locale?: StoreLocale;
 }) {
-  await ensureSeeded();
   const search = filters?.search?.trim();
   const tag = filters?.tag?.trim();
   const rightsType = filters?.rightsType?.toUpperCase() as "ORIGINAL" | "LICENSED" | undefined;
@@ -708,12 +722,11 @@ export async function listCharacters(filters?: {
 }
 
 export async function getCharacterView(identifier: string, locale?: StoreLocale): Promise<CharacterView> {
-  await ensureSeeded();
   const record = await requireCharacter(prisma, identifier);
   const character = toCharacter(record, locale);
   const relatedCharacters = character.relatedCharacterIds.length
     ? await prisma.character.findMany({
-        where: { id: { in: character.relatedCharacterIds } },
+        where: { id: { in: character.relatedCharacterIds }, publishStatus: "PUBLISHED" },
         include: characterInclude,
       })
     : [];
@@ -727,8 +740,16 @@ export async function getCharacterView(identifier: string, locale?: StoreLocale)
   return {
     character,
     series: toSeries(record.series, locale),
-    assets: record.assets.map(toAsset),
-    rightsGrants: record.rightsGrants.map(toRightsGrant),
+    assets: record.assets
+      .filter(
+        (asset) =>
+          asset.workflowStatus === "PUBLISHED" &&
+          asset.contentRating === "SFW" &&
+          asset.permissionStatus !== "REJECTED" &&
+          asset.permissionStatus !== "TAKEDOWN_REQUESTED",
+      )
+      .map(toAsset),
+    rightsGrants: [],
     sourceAttribution: record.sourceAttribution ? toSourceAttribution(record.sourceAttribution) : undefined,
     attributes: (record.attributes as unknown as AttributeWithDefinition[])
       .map((attribute) => ({
@@ -758,18 +779,11 @@ export async function getCharacterView(identifier: string, locale?: StoreLocale)
       createdAt: comment.createdAt.toISOString(),
       author: comment.user.profile ? toProfile(comment.user.profile) : undefined,
     })),
-    reactions: (await prisma.reaction.findMany({ where: { characterId: character.id } })).map((reaction) => ({
-      id: reaction.id,
-      userId: reaction.userId,
-      characterId: reaction.characterId,
-      kind: reaction.kind as Reaction["kind"],
-      createdAt: reaction.createdAt.toISOString(),
-    })),
+    reactions: [],
   };
 }
 
 export async function getPortfolioView(userId?: string): Promise<PortfolioView> {
-  await ensureSeeded();
   const user = await requireUser(prisma, userId);
   const profile = user.profile ?? (await prisma.profile.findUniqueOrThrow({ where: { userId: user.id } }));
   const wallet = user.wallet ?? (await requireWallet(prisma, user.id));
@@ -828,7 +842,6 @@ export async function getPortfolioView(userId?: string): Promise<PortfolioView> 
 }
 
 export async function getShopItems(locale?: StoreLocale) {
-  await ensureSeeded();
   return (
     await prisma.shopItem.findMany({
       where: { published: true },
@@ -841,88 +854,136 @@ export async function getShopItems(locale?: StoreLocale) {
 export async function buySupport(
   identifier: string,
   quantity: number,
-  userId?: string,
-  idempotencyKey?: string,
+  quoteToken: string,
+  userId: string,
+  idempotencyKey: string,
 ) {
-  await ensureSeeded();
   const activeUserId = await getUserId(userId);
-  const key = idempotencyKey ?? `buy-${activeUserId}-${identifier}-${Date.now()}-${quantity}`;
+  const key = idempotencyKey.trim();
+  if (key.length < 8 || key.length > 160) {
+    throw new AppError("A valid Idempotency-Key header is required.", 422, "IDEMPOTENCY_KEY_REQUIRED");
+  }
 
   return runIdempotentMutation({
     userId: activeUserId,
     scope: "BUY_SUPPORT",
     key,
-    payload: { identifier, quantity },
+    payload: { identifier, quantity, quoteToken },
     operation: async (tx) => {
-    const user = await requireUser(tx, activeUserId);
-    const characterRecord = await requireCharacter(tx, identifier, { tags: true });
-    const character = toCharacter(characterRecord);
-    const wallet = await requireWallet(tx, user.id);
-    const position = await tx.supportPosition.upsert({
-      where: { userId_characterId: { userId: user.id, characterId: character.id } },
-      create: { userId: user.id, characterId: character.id, units: 0, averageCost: 0 },
-      update: {},
-    });
-    const { totalCost, unitPrice } = calculateBuyBatchCost(character, quantity);
-
-    if (wallet.softBalance < totalCost) {
-      throw new Error("Not enough SUP to complete this support purchase.");
-    }
-
-    await createLedgerEntry(
-      tx,
-      wallet,
-      -totalCost,
-      "BUY_SUPPORT",
-      character.id,
-      `ledger-${key}`,
-    );
-
-    const nextUnits = position.units + quantity;
-    const averageCost = Math.round(
-      (position.averageCost * position.units + totalCost) / Math.max(nextUnits, 1),
-    );
-
-    const updatedPosition = await tx.supportPosition.update({
-      where: { id: position.id },
-      data: { units: nextUnits, averageCost },
-    });
-    await tx.character.update({
-      where: { id: character.id },
-      data: {
-        circulatingUnits: { increment: quantity },
-        supporterCount: position.units === 0 ? { increment: 1 } : undefined,
-      },
-    });
-    await completeMissionEvent(tx, user.id, "SUPPORT_OR_WATCH");
-    const trade = await tx.trade.create({
-      data: {
+      const user = await requireUser(tx, activeUserId);
+      const characterRecord = await requireCharacter(tx, identifier, { tags: true });
+      const character = toCharacter(characterRecord);
+      const wallet = await requireWallet(tx, user.id);
+      const position = await tx.supportPosition.upsert({
+        where: { userId_characterId: { userId: user.id, characterId: character.id } },
+        create: { userId: user.id, characterId: character.id, units: 0, averageCost: 0 },
+        update: {},
+      });
+      const quote = verifySignedMarketQuote({
+        token: quoteToken,
         userId: user.id,
-        characterId: character.id,
         side: "BUY",
         quantity,
-        totalCost,
-        unitPrice,
-      },
-    });
-    await createNotification(
-      tx,
-      user.id,
-      `Supported ${character.name}`,
-      `You added ${quantity} support unit${quantity > 1 ? "s" : ""} at ${unitPrice} SUP.`,
-      "TRADE",
-    );
+        character: {
+          id: characterRecord.id,
+          basePrice: characterRecord.basePrice,
+          priceStep: characterRecord.priceStep,
+          unitsPerStep: characterRecord.unitsPerStep,
+          circulatingUnits: characterRecord.circulatingUnits,
+          marketVersion: characterRecord.marketVersion,
+        },
+      });
 
-    return {
-      trade: {
-        ...trade,
-        side: "BUY" as const,
-        createdAt: trade.createdAt.toISOString(),
-      },
-      wallet: toWallet(wallet),
-      position: toPosition(updatedPosition),
-      quote: getBuyQuote({ ...character, circulatingUnits: character.circulatingUnits + quantity }),
-    };
+      if (wallet.softBalance < quote.total) {
+        throw new AppError("Not enough SUP to complete this support purchase.", 422, "INSUFFICIENT_BALANCE");
+      }
+
+      const marketUpdate = await tx.character.updateMany({
+        where: {
+          id: character.id,
+          marketVersion: quote.marketVersion,
+          circulatingUnits: quote.supplyBefore,
+        },
+        data: {
+          circulatingUnits: quote.supplyAfter,
+          supporterCount: position.units === 0 ? characterRecord.supporterCount + 1 : characterRecord.supporterCount,
+          marketVersion: { increment: 1 },
+        },
+      });
+      if (marketUpdate.count !== 1) {
+        throw new AppError("The support quote changed. Request a fresh quote.", 409, "QUOTE_CHANGED");
+      }
+
+      await createLedgerEntry(tx, wallet, -quote.total, "BUY_SUPPORT", character.id, `ledger-${key}`);
+      const nextUnits = position.units + quantity;
+      const averageCost = Math.round(
+        (position.averageCost * position.units + quote.total) / nextUnits,
+      );
+      const updatedPosition = await tx.supportPosition.update({
+        where: { id: position.id },
+        data: { units: nextUnits, averageCost },
+      });
+      await completeMissionEvent(tx, user.id, "SUPPORT_OR_WATCH");
+      const campaignProgress = await advanceSupportCampaigns(tx, {
+        userId: user.id,
+        characterId: character.id,
+        quantity,
+      });
+      const trade = await tx.trade.create({
+        data: {
+          userId: user.id,
+          characterId: character.id,
+          side: "BUY",
+          quantity,
+          totalCost: quote.total,
+          unitPrice: quote.lastPrice,
+          quoteBefore: quote.quoteBefore,
+          quoteAfter: quote.quoteAfter,
+          supplyBefore: quote.supplyBefore,
+          supplyAfter: quote.supplyAfter,
+          firstUnitPrice: quote.firstPrice,
+          lastUnitPrice: quote.lastPrice,
+          averageUnitPrice: quote.averagePrice,
+          marketVersion: quote.marketVersion + 1,
+          idempotencyKey: key,
+        },
+      });
+      await createNotification(
+        tx,
+        user.id,
+        `Supported ${character.name}`,
+        `You added ${quantity} support unit${quantity > 1 ? "s" : ""} for ${quote.total} SUP.`,
+        "TRADE",
+      );
+      await triggerMarketAlerts(tx, {
+        characterId: character.id,
+        characterName: character.name,
+        side: "BUY",
+        quoteAfter: quote.quoteAfter,
+        campaignProgress,
+      });
+
+      return {
+        trade: {
+          id: trade.id,
+          characterId: trade.characterId,
+          side: trade.side,
+          quantity: trade.quantity,
+          total: trade.totalCost,
+          averagePrice: trade.averageUnitPrice,
+          firstPrice: trade.firstUnitPrice,
+          lastPrice: trade.lastUnitPrice,
+          quoteBefore: trade.quoteBefore,
+          quoteAfter: trade.quoteAfter,
+          supplyBefore: trade.supplyBefore,
+          supplyAfter: trade.supplyAfter,
+          marketVersion: trade.marketVersion,
+          timestamp: trade.createdAt.toISOString(),
+        },
+        wallet: toWallet(wallet),
+        position: toPosition(updatedPosition),
+        campaigns: campaignProgress,
+      };
     },
   });
 }
@@ -930,91 +991,135 @@ export async function buySupport(
 export async function sellSupport(
   identifier: string,
   quantity: number,
-  userId?: string,
-  idempotencyKey?: string,
+  quoteToken: string,
+  userId: string,
+  idempotencyKey: string,
 ) {
-  await ensureSeeded();
   const activeUserId = await getUserId(userId);
-  const key = idempotencyKey ?? `sell-${activeUserId}-${identifier}-${Date.now()}-${quantity}`;
+  const key = idempotencyKey.trim();
+  if (key.length < 8 || key.length > 160) {
+    throw new AppError("A valid Idempotency-Key header is required.", 422, "IDEMPOTENCY_KEY_REQUIRED");
+  }
 
   return runIdempotentMutation({
     userId: activeUserId,
     scope: "SELL_SUPPORT",
     key,
-    payload: { identifier, quantity },
+    payload: { identifier, quantity, quoteToken },
     operation: async (tx) => {
-    const user = await requireUser(tx, activeUserId);
-    const characterRecord = await requireCharacter(tx, identifier, { tags: true });
-    const character = toCharacter(characterRecord);
-    const wallet = await requireWallet(tx, user.id);
-    const position = await tx.supportPosition.upsert({
-      where: { userId_characterId: { userId: user.id, characterId: character.id } },
-      create: { userId: user.id, characterId: character.id, units: 0, averageCost: 0 },
-      update: {},
-    });
-
-    if (position.units < quantity) {
-      throw new Error("You cannot sell more support units than you hold.");
-    }
-
-    const { totalReturn, unitPrice } = calculateSellBatchReturn(character, quantity);
-    await createLedgerEntry(
-      tx,
-      wallet,
-      totalReturn,
-      "SELL_SUPPORT",
-      character.id,
-      `ledger-${key}`,
-    );
-
-    const nextUnits = position.units - quantity;
-    const updatedPosition = await tx.supportPosition.update({
-      where: { id: position.id },
-      data: { units: nextUnits, averageCost: nextUnits === 0 ? 0 : position.averageCost },
-    });
-    await tx.character.update({
-      where: { id: character.id },
-      data: {
-        circulatingUnits: Math.max(character.circulatingUnits - quantity, 0),
-        supporterCount:
-          nextUnits === 0 ? Math.max(character.supporterCount - 1, 0) : character.supporterCount,
-      },
-    });
-    const trade = await tx.trade.create({
-      data: {
+      const user = await requireUser(tx, activeUserId);
+      const characterRecord = await requireCharacter(tx, identifier, { tags: true });
+      const character = toCharacter(characterRecord);
+      const wallet = await requireWallet(tx, user.id);
+      const position = await tx.supportPosition.findUnique({
+        where: { userId_characterId: { userId: user.id, characterId: character.id } },
+      });
+      if (!position || position.units < quantity) {
+        throw new AppError(
+          "You cannot sell more support units than you hold.",
+          422,
+          "INSUFFICIENT_POSITION",
+        );
+      }
+      const quote = verifySignedMarketQuote({
+        token: quoteToken,
         userId: user.id,
-        characterId: character.id,
         side: "SELL",
         quantity,
-        totalCost: totalReturn,
-        unitPrice,
-      },
-    });
-    await createNotification(
-      tx,
-      user.id,
-      `Trimmed ${character.name}`,
-      `You sold ${quantity} support unit${quantity > 1 ? "s" : ""} for ${totalReturn} SUP.`,
-      "TRADE",
-    );
+        character: {
+          id: characterRecord.id,
+          basePrice: characterRecord.basePrice,
+          priceStep: characterRecord.priceStep,
+          unitsPerStep: characterRecord.unitsPerStep,
+          circulatingUnits: characterRecord.circulatingUnits,
+          marketVersion: characterRecord.marketVersion,
+        },
+      });
+      const nextUnits = position.units - quantity;
+      const marketUpdate = await tx.character.updateMany({
+        where: {
+          id: character.id,
+          marketVersion: quote.marketVersion,
+          circulatingUnits: quote.supplyBefore,
+        },
+        data: {
+          circulatingUnits: quote.supplyAfter,
+          supporterCount:
+            nextUnits === 0
+              ? Math.max(characterRecord.supporterCount - 1, 0)
+              : characterRecord.supporterCount,
+          marketVersion: { increment: 1 },
+        },
+      });
+      if (marketUpdate.count !== 1) {
+        throw new AppError("The support quote changed. Request a fresh quote.", 409, "QUOTE_CHANGED");
+      }
 
-    return {
-      trade: {
-        ...trade,
-        side: "SELL" as const,
-        createdAt: trade.createdAt.toISOString(),
-      },
-      wallet: toWallet(wallet),
-      position: toPosition(updatedPosition),
-      quote: getBuyQuote({ ...character, circulatingUnits: Math.max(character.circulatingUnits - quantity, 0) }),
-    };
+      await createLedgerEntry(tx, wallet, quote.total, "SELL_SUPPORT", character.id, `ledger-${key}`);
+      const updatedPosition = await tx.supportPosition.update({
+        where: { id: position.id },
+        data: { units: nextUnits, averageCost: nextUnits === 0 ? 0 : position.averageCost },
+      });
+      const trade = await tx.trade.create({
+        data: {
+          userId: user.id,
+          characterId: character.id,
+          side: "SELL",
+          quantity,
+          totalCost: quote.total,
+          unitPrice: quote.lastPrice,
+          quoteBefore: quote.quoteBefore,
+          quoteAfter: quote.quoteAfter,
+          supplyBefore: quote.supplyBefore,
+          supplyAfter: quote.supplyAfter,
+          firstUnitPrice: quote.firstPrice,
+          lastUnitPrice: quote.lastPrice,
+          averageUnitPrice: quote.averagePrice,
+          marketVersion: quote.marketVersion + 1,
+          idempotencyKey: key,
+        },
+      });
+      await createNotification(
+        tx,
+        user.id,
+        `Trimmed ${character.name}`,
+        `You sold ${quantity} support unit${quantity > 1 ? "s" : ""} for ${quote.total} SUP.`,
+        "TRADE",
+      );
+      await triggerMarketAlerts(tx, {
+        characterId: character.id,
+        characterName: character.name,
+        side: "SELL",
+        quoteAfter: quote.quoteAfter,
+        campaignProgress: [],
+      });
+
+      return {
+        trade: {
+          id: trade.id,
+          characterId: trade.characterId,
+          side: trade.side,
+          quantity: trade.quantity,
+          total: trade.totalCost,
+          averagePrice: trade.averageUnitPrice,
+          firstPrice: trade.firstUnitPrice,
+          lastPrice: trade.lastUnitPrice,
+          quoteBefore: trade.quoteBefore,
+          quoteAfter: trade.quoteAfter,
+          supplyBefore: trade.supplyBefore,
+          supplyAfter: trade.supplyAfter,
+          marketVersion: trade.marketVersion,
+          timestamp: trade.createdAt.toISOString(),
+        },
+        wallet: toWallet(wallet),
+        position: toPosition(updatedPosition),
+        campaigns: [],
+      };
     },
   });
 }
 
 export async function claimDailyReward(userId?: string) {
-  await ensureSeeded();
-
   return withSerializableRetry(async (tx) => {
     const user = await requireUser(tx, userId);
     const wallet = await requireWallet(tx, user.id);
@@ -1064,7 +1169,6 @@ export async function claimAdReward(
   requestedSlot?: number,
   proofId?: string,
 ) {
-  await ensureSeeded();
   const activeUserId = await getUserId(userId);
   const dayKey = getHongKongDayKey();
   const existingClaims = await prisma.adRewardClaim.findMany({
@@ -1174,7 +1278,6 @@ export async function completeAdReward(input: {
 }
 
 export async function toggleWatchlist(characterId: string, userId?: string) {
-  await ensureSeeded();
   const user = await requireUser(prisma, userId);
   await requireCharacter(prisma, characterId, { tags: true });
   const existing = await prisma.watchlistItem.findUnique({
@@ -1194,7 +1297,6 @@ export async function toggleWatchlist(characterId: string, userId?: string) {
 }
 
 export async function addComment(characterId: string, content: string, userId?: string) {
-  await ensureSeeded();
   const user = await requireUser(prisma, userId);
   await requireCharacter(prisma, characterId, { tags: true });
 
@@ -1229,7 +1331,6 @@ export async function addComment(characterId: string, content: string, userId?: 
 }
 
 export async function toggleReaction(characterId: string, kind: Reaction["kind"], userId?: string) {
-  await ensureSeeded();
   const user = await requireUser(prisma, userId);
   await requireCharacter(prisma, characterId, { tags: true });
   const existing = await prisma.reaction.findUnique({
@@ -1255,7 +1356,6 @@ export async function createReport(input: {
   commentId?: string;
   userId?: string;
 }) {
-  await ensureSeeded();
   const user = await requireUser(prisma, input.userId);
 
   return prisma.report.create({
@@ -1275,7 +1375,6 @@ export async function purchaseShopItem(
   equip = true,
   idempotencyKey?: string,
 ) {
-  await ensureSeeded();
   const activeUserId = await getUserId(userId);
   const key = idempotencyKey ?? `shop-${activeUserId}-${itemId}-${Date.now()}`;
 
@@ -1385,7 +1484,6 @@ export async function createAdminCharacter(
   },
   userId?: string,
 ) {
-  await ensureSeeded();
   await requireAdmin(prisma, userId);
 
   for (const label of input.tags) {
@@ -1501,10 +1599,11 @@ export async function createAdminAsset(
   input: Omit<CharacterAsset, "id" | "version" | "publishedAt"> & {
     workflowStatus: AssetWorkflowStatus;
     sourceKind?: AssetSourceKind;
+    zhAltText: string;
+    riskAcknowledged?: boolean;
   },
   userId?: string,
 ) {
-  await ensureSeeded();
   await requireAdmin(prisma, userId);
   if (input.workflowStatus !== "UPLOADED") {
     throw new AppError("New assets must enter the workflow as UPLOADED.", 422, "INVALID_WORKFLOW_ENTRY");
@@ -1533,6 +1632,20 @@ export async function createAdminAsset(
       byteSize: input.byteSize,
       aiPrompt: input.aiPrompt,
       aiModel: input.aiModel,
+      permissionStatus: input.permissionStatus ?? "UNVERIFIED",
+      contentRating: input.contentRating ?? "UNRATED",
+      creatorName: input.creatorName,
+      creatorUrl: input.creatorUrl,
+      originalMediaUrl: input.originalMediaUrl,
+      licenseUrl: input.licenseUrl,
+      permissionEvidence: input.permissionEvidence,
+      retrievedAt: input.retrievedAt ? new Date(input.retrievedAt) : undefined,
+      checksum: input.checksum,
+      riskAcknowledgedById: input.riskAcknowledged ? userId : undefined,
+      riskAcknowledgedAt: input.riskAcknowledged ? new Date() : undefined,
+      primaryPriority: input.primaryPriority ?? 0,
+      locales: { create: [{ locale: "EN", altText: input.altText }, { locale: "ZH_HANT", altText: input.zhAltText }] },
+      auditLogs: { create: { actorUserId: userId, action: "CREATED", detail: { sourceKind: input.sourceKind ?? "USER_PROVIDED" } } },
     },
   });
 
@@ -1553,8 +1666,8 @@ export async function updateAssetWorkflow(
   nextStatus: AssetWorkflowStatus,
   userId?: string,
 ) {
-  await requireAdmin(prisma, userId);
-  const asset = await prisma.characterAsset.findUnique({ where: { id: assetId } });
+  const admin = await requireAdmin(prisma, userId);
+  const asset = await prisma.characterAsset.findUnique({ where: { id: assetId }, include: { locales: true } });
   if (!asset) {
     throw new AppError("Asset not found.", 404, "ASSET_NOT_FOUND");
   }
@@ -1563,7 +1676,7 @@ export async function updateAssetWorkflow(
     return toAsset(
       await prisma.characterAsset.update({
         where: { id: assetId },
-        data: { workflowStatus: "PULLED", publishedAt: null },
+        data: { workflowStatus: "PULLED", publishedAt: null, auditLogs: { create: { actorUserId: admin.id, action: "PULLED", detail: { previousStatus: asset.workflowStatus } } } },
       }),
     );
   }
@@ -1588,13 +1701,23 @@ export async function updateAssetWorkflow(
     sourceLabel: asset.sourceLabel ?? undefined,
     aiPrompt: asset.aiPrompt ?? undefined,
     aiModel: asset.aiModel ?? undefined,
+    permissionStatus: asset.permissionStatus,
+    contentRating: asset.contentRating,
+    riskAcknowledgedAt: asset.riskAcknowledgedAt,
+    licenseName: asset.licenseName ?? undefined,
+    licenseUrl: asset.licenseUrl ?? undefined,
   });
+  if (nextStatus === "PUBLISHED" && !["EN", "ZH_HANT"].every((locale) => asset.locales.some((entry) => entry.locale === locale && entry.altText.trim()))) {
+    throw new AppError("English and Traditional Chinese alt text are required.", 422, "ASSET_LOCALES_INCOMPLETE");
+  }
   return toAsset(
     await prisma.characterAsset.update({
       where: { id: assetId },
       data: {
         workflowStatus: nextStatus,
         publishedAt: nextStatus === "PUBLISHED" ? new Date() : null,
+        ...(nextStatus === "REVIEWED" ? { reviewedById: admin.id, reviewedAt: new Date() } : {}),
+        auditLogs: { create: { actorUserId: admin.id, action: nextStatus === "PUBLISHED" ? "PUBLISHED" : nextStatus === "RIGHTS_CHECKED" ? "RIGHTS_REVIEWED" : "METADATA_UPDATED", detail: { workflowStatus: nextStatus } } },
       },
     }),
   );
@@ -1604,7 +1727,6 @@ export async function createAdminShopItem(
   input: Omit<ShopItem, "id" | "slug" | "published" | "unlockPayload"> & { assetId: string },
   userId?: string,
 ) {
-  await ensureSeeded();
   await requireAdmin(prisma, userId);
 
   const asset = await prisma.characterAsset.findUnique({ where: { id: input.assetId } });
@@ -1650,7 +1772,6 @@ export async function importBangumiCharacter(
   },
   userId?: string,
 ) {
-  await ensureSeeded();
   await requireAdmin(prisma, userId);
   validateBangumiAttribution(input);
 
@@ -1733,7 +1854,6 @@ export async function importBangumiCharacter(
 }
 
 export async function importBangumiSubject(subjectId: string, userId?: string) {
-  await ensureSeeded();
   await requireAdmin(prisma, userId);
   const sample = bangumiImportSamples.find((entry) => entry.subjectId === subjectId);
 
@@ -1770,7 +1890,6 @@ export async function importBangumiSubject(subjectId: string, userId?: string) {
 }
 
 export async function getAdminSnapshot(userId?: string) {
-  await ensureSeeded();
   await requireAdmin(prisma, userId);
   const [characters, assets, rightsGrants, reports, shopItems, sourceAttributions] =
     await Promise.all([
@@ -1806,12 +1925,10 @@ export function resetDemoStore() {
 }
 
 export async function getCommentCount(characterId: string) {
-  await ensureSeeded();
   return prisma.comment.count({ where: { characterId } });
 }
 
 export async function getWatchlistIds(userId?: string) {
-  await ensureSeeded();
   const activeUserId = userId ?? (await getOptionalSessionUserId());
   if (!activeUserId) {
     return [];
@@ -1821,7 +1938,6 @@ export async function getWatchlistIds(userId?: string) {
 }
 
 export async function getReactionSummary(characterId: string) {
-  await ensureSeeded();
   const reactions = await prisma.reaction.findMany({ where: { characterId } });
   return reactions.reduce<Record<string, number>>((summary, reaction) => {
     summary[reaction.kind] = (summary[reaction.kind] ?? 0) + 1;
@@ -1830,7 +1946,6 @@ export async function getReactionSummary(characterId: string) {
 }
 
 export async function getRecentTrades(limit = 8) {
-  await ensureSeeded();
   const trades = await prisma.trade.findMany({
     include: { character: { include: { tags: true } } },
     orderBy: { createdAt: "desc" },
@@ -1839,19 +1954,18 @@ export async function getRecentTrades(limit = 8) {
 
   return trades.map((trade) => ({
     id: trade.id,
-    userId: trade.userId,
     characterId: trade.characterId,
-    side: trade.side as "BUY" | "SELL",
+    side: trade.side,
     quantity: trade.quantity,
     totalCost: trade.totalCost,
-    unitPrice: trade.unitPrice,
+    unitPrice: trade.averageUnitPrice,
+    quoteAfter: trade.quoteAfter,
     createdAt: trade.createdAt.toISOString(),
     character: toCharacter(trade.character),
   }));
 }
 
 export async function getUserByHandle(handle: string) {
-  await ensureSeeded();
   const profile = await prisma.profile.findUnique({ where: { handle } });
   if (!profile) {
     throw new Error("Profile not found.");
@@ -1886,7 +2000,6 @@ export async function getUserByHandle(handle: string) {
 }
 
 export async function bootstrapStarterBalance(userId?: string) {
-  await ensureSeeded();
   const user = await requireUser(prisma, userId);
   const wallet = await requireWallet(prisma, user.id);
 
@@ -1910,24 +2023,20 @@ export async function bootstrapStarterBalance(userId?: string) {
 }
 
 export async function getProfiles() {
-  await ensureSeeded();
   return (await prisma.profile.findMany()).map(toProfile);
 }
 
 export async function getUsers() {
-  await ensureSeeded();
   return (await prisma.user.findMany()).map(toUser);
 }
 
 export async function listComfortModes(locale?: StoreLocale) {
-  await ensureSeeded();
   return (
     await prisma.comfortMode.findMany({ include: { locales: true }, orderBy: { sortOrder: "asc" } })
   ).map((mode) => toComfortMode(mode, locale));
 }
 
 export async function getComfortModeView(slug: string, locale?: StoreLocale): Promise<ComfortModeView> {
-  await ensureSeeded();
   const mode = await prisma.comfortMode.findUnique({
     where: { slug },
     include: {
@@ -1973,7 +2082,6 @@ export async function createComfortSession(input: {
   note?: string;
   userId?: string;
 }) {
-  await ensureSeeded();
   const user = await requireUser(prisma, input.userId);
   const modes = await listComfortModes();
   const modeSlug = input.modeSlug ?? matchComfortMode(input.needText ?? "", modes);
@@ -2011,7 +2119,6 @@ export async function createComfortReaction(input: {
   kind: "SOOTHED" | "SWEET" | "REPLAY";
   userId?: string;
 }) {
-  await ensureSeeded();
   const user = await requireUser(prisma, input.userId);
   const reaction = await prisma.comfortReaction.create({
     data: {
@@ -2045,7 +2152,6 @@ export async function createAdminComfortContent(
   },
   userId?: string,
 ) {
-  await ensureSeeded();
   await requireAdmin(prisma, userId);
   const mode = await prisma.comfortMode.findUnique({ where: { slug: input.modeSlug } });
 
@@ -2100,7 +2206,7 @@ export async function updatePinnedCharacters(characterIds: string[], userId?: st
   return toProfile(profile);
 }
 
-export async function getDailyMissions(userId?: string, locale: "en" | "zh-Hant" = "en") {
+export async function getDailyMissions(userId?: string, locale: "en" | "zh-Hant" = "en"): Promise<DailyMissionView[]> {
   const activeUserId = await getUserId(userId);
   const dayKey = getHongKongDayKey();
   const progress = await prisma.dailyMissionProgress.findMany({
@@ -2108,8 +2214,8 @@ export async function getDailyMissions(userId?: string, locale: "en" | "zh-Hant"
   });
   const byKey = new Map(progress.map((entry) => [entry.missionKey, entry]));
 
-  return Object.entries(missionDefinitions).map(([key, definition]) => {
-    const state = byKey.get(key as keyof typeof missionDefinitions);
+  return (Object.entries(missionDefinitions) as Array<[keyof typeof missionDefinitions, (typeof missionDefinitions)[keyof typeof missionDefinitions]]>).map(([key, definition]) => {
+    const state = byKey.get(key);
     const [title, description] = locale === "zh-Hant" ? definition.zhHant : definition.en;
     return {
       key,
@@ -2320,50 +2426,20 @@ export async function claimWorkShift(
   });
 }
 
-export async function getCharacterHistory(identifier: string, limit = 60) {
-  const character = await requireCharacter(prisma, identifier, { tags: true });
-  const trades = await prisma.trade.findMany({
-    where: { characterId: character.id },
-    orderBy: { createdAt: "desc" },
-    take: Math.min(Math.max(limit, 1), 180),
-  });
-  return trades.reverse().map((trade) => ({
-    at: trade.createdAt.toISOString(),
-    quote: trade.unitPrice,
-    side: trade.side,
-    quantity: trade.quantity,
-  }));
+export async function getCharacterHistory(
+  identifier: string,
+  range: MarketHistoryRange = "7d",
+) {
+  return getMarketHistory(identifier, range);
 }
 
-export async function getMarketFeed(limit = 12) {
-  const recentTrades = await getRecentTrades(limit);
-  const trendingRows = await prisma.trade.groupBy({
-    by: ["characterId"],
-    where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
-    _sum: { quantity: true },
-    _count: { _all: true },
-    orderBy: { _count: { characterId: "desc" } },
-    take: 8,
-  });
-  const characters = await prisma.character.findMany({
-    where: { id: { in: trendingRows.map((row) => row.characterId) } },
-    include: { tags: true },
-  });
-  const byId = new Map(characters.map((character) => [character.id, toCharacter(character)]));
-  return {
-    recentTrades,
-    trending: trendingRows.flatMap((row) => {
-      const character = byId.get(row.characterId);
-      return character
-        ? [{ character, activity: row._count._all, units: row._sum.quantity ?? 0 }]
-        : [];
-    }),
-  };
+export async function getMarketFeed(options: MarketFeedOptions | number = {}) {
+  return getPositiveMarketFeed(typeof options === "number" ? { limit: options } : options);
 }
 
 export async function getMeDashboard(userId?: string, locale: "en" | "zh-Hant" = "en") {
   const activeUserId = await getUserId(userId);
-  const [portfolio, missions, work, ledger] = await Promise.all([
+  const [portfolio, missions, work, ledger, campaigns, alerts] = await Promise.all([
     getPortfolioView(activeUserId),
     getDailyMissions(activeUserId, locale),
     getWorkDashboard(activeUserId),
@@ -2372,11 +2448,15 @@ export async function getMeDashboard(userId?: string, locale: "en" | "zh-Hant" =
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
+    listSupportCampaigns({ userId: activeUserId, locale, includeCompleted: true }),
+    listMarketAlerts(activeUserId),
   ]);
   return {
     ...portfolio,
     missions,
     work,
     ledger: ledger.map((entry) => ({ ...entry, createdAt: entry.createdAt.toISOString() })),
+    campaigns,
+    alerts,
   };
 }

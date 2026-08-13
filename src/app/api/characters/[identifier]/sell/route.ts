@@ -1,4 +1,4 @@
-import { apiOk, handleApiError, parseJson } from "@/lib/api";
+import { AppError, apiOk, handleApiError, parseJson } from "@/lib/api";
 import { tradeSchema } from "@/lib/schemas";
 import { sellSupport } from "@/lib/store";
 import { requireSessionUserId } from "@/lib/auth";
@@ -11,8 +11,13 @@ export async function POST(
     const payload = tradeSchema.parse(await parseJson(request));
     const { identifier } = await params;
     const userId = await requireSessionUserId();
-    const idempotencyKey = payload.idempotencyKey ?? request.headers.get("idempotency-key") ?? undefined;
-    return apiOk(await sellSupport(identifier, payload.quantity, userId, idempotencyKey));
+    const idempotencyKey = request.headers.get("idempotency-key")?.trim();
+    if (!idempotencyKey) {
+      throw new AppError("Idempotency-Key header is required.", 422, "IDEMPOTENCY_KEY_REQUIRED");
+    }
+    return apiOk(
+      await sellSupport(identifier, payload.quantity, payload.quoteToken, userId, idempotencyKey),
+    );
   } catch (error) {
     return handleApiError(error);
   }

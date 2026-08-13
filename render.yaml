@@ -19,6 +19,8 @@ services:
         generateValue: true
       - key: NEXTAUTH_SECRET
         generateValue: true
+      - key: MARKET_QUOTE_SECRET
+        generateValue: true
       - key: NEXTAUTH_URL
         sync: false
       - key: AUTH_GOOGLE_ID
@@ -48,4 +50,6 @@ services:
       - key: DEMO_MODE
         value: "false"
       - key: DEMO_ADMIN_ENABLED
+        value: "false"
+      - key: ALLOW_BETA_RESET
         value: "false"

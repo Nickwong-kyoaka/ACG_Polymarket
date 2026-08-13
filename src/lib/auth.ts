@@ -1,6 +1,7 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
+import { Prisma } from "@prisma/client";
 import type { UserRole } from "@/lib/types";
 import { AuthenticationError, AuthorizationError } from "@/lib/api";
 import { STARTER_BALANCE } from "@/lib/constants";
@@ -35,79 +36,86 @@ async function provisionUser(input: {
   providerAccountId?: string;
 }) {
   const email = input.email?.toLowerCase() ?? null;
-  const existing = email ? await prisma.user.findUnique({ where: { email } }) : undefined;
-  const role: UserRole = email && adminEmails().includes(email) ? "ADMIN" : "USER";
+  const requestedAdmin = Boolean(email && adminEmails().includes(email));
 
-  if (existing) {
-    const updated = await prisma.user.update({
-      where: { id: existing.id },
-      data: { name: input.name ?? existing.name, image: input.image ?? existing.image, role },
-    });
-    if (input.provider && input.providerAccountId) {
-      await prisma.authIdentity.upsert({
-        where: {
-          provider_providerAccountId: {
-            provider: input.provider,
-            providerAccountId: input.providerAccountId,
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+    const existing = email
+      ? await tx.user.findUnique({ where: { email } })
+      : input.id
+        ? await tx.user.findUnique({ where: { id: input.id } })
+        : null;
+    const role: UserRole = requestedAdmin || existing?.role === "ADMIN" ? "ADMIN" : "USER";
+    const user = existing
+      ? await tx.user.update({
+          where: { id: existing.id },
+          data: { name: input.name ?? existing.name, image: input.image ?? existing.image, role },
+        })
+      : await tx.user.create({
+          data: {
+            ...(input.id ? { id: input.id } : {}),
+            email,
+            name: input.name ?? "Supporter",
+            image: input.image,
+            role,
           },
-        },
-        create: {
-          userId: updated.id,
-          provider: input.provider,
-          providerAccountId: input.providerAccountId,
-        },
-        update: { userId: updated.id },
-      });
-    }
-    return updated;
-  }
+        });
 
-  return prisma.$transaction(async (tx) => {
-    const created = await tx.user.create({
-      data: {
-        ...(input.id ? { id: input.id } : {}),
-        email,
-        name: input.name ?? "Supporter",
-        image: input.image,
-        role,
-      },
+    const candidate = `${handleBase(email ?? input.name ?? user.id)}-${user.id.slice(-5)}`;
+    const wallet = await tx.wallet.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, softBalance: STARTER_BALANCE, premiumBalance: 0 },
+      update: {},
     });
-    const candidate = `${handleBase(email ?? input.name ?? created.id)}-${created.id.slice(-5)}`;
-    const wallet = await tx.wallet.create({
-      data: { userId: created.id, softBalance: STARTER_BALANCE, premiumBalance: 0 },
-    });
-    await tx.profile.create({
-      data: {
-        userId: created.id,
+    await tx.profile.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
         handle: candidate,
         displayName: input.name ?? "Supporter",
         bio: "A new supporter in the ACG Exchange.",
         favoriteTags: [],
         pinnedCharacterIds: [],
       },
+      update: input.name ? { displayName: input.name } : {},
     });
-    await tx.ledgerEntry.create({
-      data: {
+    await tx.ledgerEntry.upsert({
+      where: { idempotencyKey: `starter-${user.id}` },
+      create: {
         walletId: wallet.id,
         currencyType: "SOFT",
         delta: STARTER_BALANCE,
         balanceAfter: STARTER_BALANCE,
         referenceType: "STARTER_GRANT",
-        referenceId: created.id,
-        idempotencyKey: `starter-${created.id}`,
+        referenceId: user.id,
+        idempotencyKey: `starter-${user.id}`,
       },
+      update: {},
     });
     if (input.provider && input.providerAccountId) {
-      await tx.authIdentity.create({
-        data: {
-          userId: created.id,
-          provider: input.provider,
-          providerAccountId: input.providerAccountId,
+      await tx.authIdentity.upsert({
+        where: {
+          provider_providerAccountId: {
+            provider: input.provider,
+            providerAccountId: input.providerAccountId,
+          },
         },
+        create: { userId: user.id, provider: input.provider, providerAccountId: input.providerAccountId },
+        update: { userId: user.id },
       });
     }
-    return created;
-  });
+        return user;
+      }, { isolationLevel: "Serializable" });
+    } catch (error) {
+      const retryable =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === "P2002" || error.code === "P2034");
+      if (!retryable || attempt === 2) throw error;
+    }
+  }
+
+  throw new Error("User provisioning retry limit reached.");
 }
 
 if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {

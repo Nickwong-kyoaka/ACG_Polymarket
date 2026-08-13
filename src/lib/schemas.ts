@@ -2,7 +2,18 @@ import { z } from "zod";
 
 export const tradeSchema = z.object({
   quantity: z.number().int().min(1).max(25),
-  idempotencyKey: z.string().min(8).max(160).optional(),
+  quoteToken: z.string().min(32).max(4096),
+});
+
+export const tradeQuoteSchema = z.object({
+  side: z.enum(["BUY", "SELL"]),
+  quantity: z.number().int().min(1).max(25),
+});
+
+export const marketAlertSchema = z.object({
+  characterId: z.string().min(1),
+  kind: z.enum(["QUOTE_ABOVE", "QUOTE_BELOW", "CAMPAIGN_MILESTONE", "SUPPORT_ACTIVITY"]),
+  thresholdValue: z.number().int().positive().nullable().optional(),
 });
 
 export const commentSchema = z.object({
@@ -70,6 +81,7 @@ export const adminAssetSchema = z.object({
   label: z.string().min(2),
   storageKey: z.string().min(2),
   altText: z.string().min(8),
+  zhAltText: z.string().min(4),
   workflowStatus: z.enum([
     "UPLOADED",
     "NORMALIZED",
@@ -81,7 +93,7 @@ export const adminAssetSchema = z.object({
   ]),
   rightsGrantId: z.string().optional(),
   sourceKind: z
-    .enum(["AI_GENERATED", "USER_PROVIDED", "BANGUMI_METADATA", "OFFICIAL_REFERENCE"])
+    .enum(["PLATFORM_ORIGINAL", "AI_GENERATED", "USER_PROVIDED", "FAN_ART", "OPEN_LICENSE", "BANGUMI_METADATA", "OFFICIAL_REFERENCE"])
     .optional(),
   sourceUrl: z.string().url().optional(),
   attributionText: z.string().min(3).optional(),
@@ -93,6 +105,17 @@ export const adminAssetSchema = z.object({
   byteSize: z.number().int().positive().optional(),
   aiPrompt: z.string().min(3).optional(),
   aiModel: z.string().min(2).optional(),
+  permissionStatus: z.enum(["VERIFIED", "CREATOR_GRANTED", "UNVERIFIED", "REJECTED", "TAKEDOWN_REQUESTED"]).optional(),
+  contentRating: z.enum(["UNRATED", "SFW", "SUGGESTIVE", "NSFW"]).optional(),
+  creatorName: z.string().min(2).optional(),
+  creatorUrl: z.string().url().optional(),
+  originalMediaUrl: z.string().url().optional(),
+  licenseUrl: z.string().url().optional(),
+  permissionEvidence: z.string().min(3).optional(),
+  retrievedAt: z.string().datetime().optional(),
+  checksum: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  riskAcknowledged: z.boolean().optional(),
+  primaryPriority: z.number().int().min(0).max(1000).optional(),
 });
 
 export const adminShopItemSchema = z.object({

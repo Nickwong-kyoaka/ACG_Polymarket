@@ -2,13 +2,26 @@ import { describe, expect, it } from "vitest";
 import { normalizeExternalScore, validateAssetSource } from "@/lib/content-policy";
 
 describe("asset/source validation", () => {
-  it("blocks published assets without a rights grant", () => {
+  it("blocks published AI assets without generation provenance", () => {
     expect(() =>
       validateAssetSource({
         workflowStatus: "PUBLISHED",
         sourceKind: "AI_GENERATED",
       }),
-    ).toThrow("Published assets require a linked rights grant.");
+    ).toThrow("Published AI-generated assets require prompt and model provenance.");
+  });
+
+  it("accepts reviewed AI media when generation provenance is complete", () => {
+    expect(() =>
+      validateAssetSource({
+        workflowStatus: "PUBLISHED",
+        sourceKind: "AI_GENERATED",
+        aiPrompt: "Original SFW character portrait with no external reference image.",
+        aiModel: "OpenAI ImageGen",
+        contentRating: "SFW",
+        permissionStatus: "VERIFIED",
+      }),
+    ).not.toThrow();
   });
 
   it("requires attribution for Bangumi metadata assets", () => {

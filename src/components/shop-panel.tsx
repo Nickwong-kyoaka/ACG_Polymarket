@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useState, useTransition } from "react";
 import { Check, LockKeyhole, Sparkles } from "lucide-react";
 import { getExchangeCopy, localizeShopItem, type PublicLocale } from "@/components/acg-locale";
@@ -50,6 +51,7 @@ export function ShopPanel({ items, inventory, locale = "en" }: { items: ShopItem
           return (
             <article key={item.id} className="exchange-panel grid overflow-hidden md:grid-cols-[.8fr_1.2fr]">
               <div className={cn("shop-preview m-4 md:m-5", item.kind === "PROFILE_THEME" && "is-theme", item.kind === "WALLPAPER" && "is-wallpaper")}>
+                {item.unlockPayload.previewUrl ? <Image src={item.unlockPayload.previewUrl} alt={`${item.title} preview`} fill sizes="(min-width: 768px) 36vw, 100vw" className="object-cover" unoptimized /> : null}
                 <span className="absolute bottom-4 left-4 z-10 rounded-full bg-[#111827]/80 px-3 py-1 text-[10px] font-black uppercase tracking-[.16em] text-white">{item.previewLabel}</span>
               </div>
               <div className="flex flex-col p-5 md:py-6 md:pr-6 md:pl-0">

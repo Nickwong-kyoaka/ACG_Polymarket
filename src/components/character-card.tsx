@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { MessageCircle, Radio, Users } from "lucide-react";
 import { CharacterArt } from "@/components/character-art";
-import { getExchangeCopy, localePath, localizeCharacter, type PublicLocale } from "@/components/acg-locale";
-import { MarketSparkline } from "@/components/market-sparkline";
+import { getExchangeCopy, localePath, localizeCharacter, localizeReleaseSeason, type PublicLocale } from "@/components/acg-locale";
+import { MarketHistoryChart } from "@/components/market-history-chart";
 import { Badge } from "@/components/ui/badge";
 import { getBuyQuote } from "@/lib/market";
 import { compactNumber, currencyLabel } from "@/lib/utils";
@@ -13,11 +13,17 @@ export function CharacterCard({
   character,
   watching = false,
   commentCount = 0,
+  activity24h,
+  campaign,
+  asset,
   locale = "en",
 }: {
   character: Character;
   watching?: boolean;
   commentCount?: number;
+  activity24h?: { buyUnits: number; uniqueSupporters: number; volume: number };
+  campaign?: { title: string; currentUnits: number; goalUnits: number; progressPercent: number } | null;
+  asset?: { publicUrl: string; altText: string };
   locale?: PublicLocale;
 }) {
   const localized = localizeCharacter(character, locale);
@@ -27,12 +33,12 @@ export function CharacterCard({
   return (
     <article className="character-card exchange-panel group overflow-hidden">
       <div className="relative">
-        <CharacterArt character={localized} priority={character.isFeatured} />
+        <CharacterArt character={localized} priority={character.isFeatured} asset={asset} />
         <div className="absolute left-4 top-4 z-10 flex flex-wrap gap-2 sm:left-5 sm:top-5">
           <Badge tone={character.rightsType === "ORIGINAL" ? "warm" : "cool"}>
             {character.rightsType === "ORIGINAL" ? copy.common.original : copy.common.metadata}
           </Badge>
-          {character.releaseSeason ? <Badge>{character.releaseSeason}</Badge> : null}
+          {character.releaseSeason ? <Badge>{localizeReleaseSeason(character.releaseSeason, locale)}</Badge> : null}
         </div>
         <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-6">
           <p className="mb-2 text-[10px] font-black uppercase tracking-[0.25em] text-white/65">
@@ -78,8 +84,10 @@ export function CharacterCard({
               <p className="mt-1 text-base font-black">{compactNumber(commentCount)}</p>
             </div>
           </div>
-          <MarketSparkline seed={character.circulatingUnits + character.supporterCount} />
+          <MarketHistoryChart characterId={character.id} locale={locale} compact />
         </div>
+
+        {activity24h || campaign ? <div className="grid gap-3 rounded-[18px_5px_18px_5px] bg-[#f5f1e8] p-4">{activity24h ? <div className="flex items-center justify-between gap-4 text-xs"><span className="font-black uppercase tracking-[.13em] text-slate-400">24H {locale === "zh-Hant" ? "正向應援" : "POSITIVE SUPPORT"}</span><span className="font-black text-[#e83c62]">+{activity24h.buyUnits} · {activity24h.uniqueSupporters} {locale === "zh-Hant" ? "人" : "fans"}</span></div> : null}{campaign ? <div><div className="flex items-center justify-between gap-3 text-[10px] font-black"><span className="truncate text-slate-600">{campaign.title}</span><span className="text-slate-400">{campaign.progressPercent}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-gradient-to-r from-[#ff4e72] to-[#ffcc66]" style={{ width: `${campaign.progressPercent}%` }} /></div></div> : null}</div> : null}
 
         <Link
           href={localePath(locale, `/character/${character.slug}`)}

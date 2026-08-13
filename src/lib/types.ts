@@ -19,10 +19,20 @@ export type AssetWorkflowStatus =
   | "PUBLISHED"
   | "PULLED";
 export type AssetSourceKind =
+  | "PLATFORM_ORIGINAL"
   | "AI_GENERATED"
   | "USER_PROVIDED"
+  | "FAN_ART"
+  | "OPEN_LICENSE"
   | "BANGUMI_METADATA"
   | "OFFICIAL_REFERENCE";
+export type AssetPermissionStatus =
+  | "VERIFIED"
+  | "CREATOR_GRANTED"
+  | "UNVERIFIED"
+  | "REJECTED"
+  | "TAKEDOWN_REQUESTED";
+export type ContentRating = "UNRATED" | "SFW" | "SUGGESTIVE" | "NSFW";
 export type CurrencyType = "SOFT" | "PREMIUM";
 export type LedgerReferenceType =
   | "STARTER_GRANT"
@@ -158,6 +168,21 @@ export interface CharacterAsset {
   byteSize?: number;
   aiPrompt?: string;
   aiModel?: string;
+  permissionStatus?: AssetPermissionStatus;
+  contentRating?: ContentRating;
+  creatorName?: string;
+  creatorUrl?: string;
+  originalMediaUrl?: string;
+  licenseUrl?: string;
+  permissionEvidence?: string;
+  commercialUseAllowed?: boolean;
+  adaptationAllowed?: boolean;
+  retrievedAt?: string;
+  checksum?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
+  riskAcknowledgedAt?: string;
+  primaryPriority?: number;
 }
 
 export interface Character {
@@ -177,6 +202,7 @@ export interface Character {
   unitsPerStep: number;
   circulatingUnits: number;
   supporterCount: number;
+  marketVersion?: number;
   isFeatured: boolean;
   tags: string[];
   accentFrom: string;
@@ -209,6 +235,15 @@ export interface Trade {
   quantity: number;
   totalCost: number;
   unitPrice: number;
+  quoteBefore?: number;
+  quoteAfter?: number;
+  supplyBefore?: number;
+  supplyAfter?: number;
+  firstUnitPrice?: number;
+  lastUnitPrice?: number;
+  averageUnitPrice?: number;
+  marketVersion?: number;
+  idempotencyKey?: string;
   createdAt: string;
 }
 

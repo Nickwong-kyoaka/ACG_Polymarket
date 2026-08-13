@@ -2,28 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BriefcaseBusiness, Heart, Home, Languages, Radio, ShoppingBag, UserRound } from "lucide-react";
+import { BriefcaseBusiness, Flag, Heart, Images, Languages, Radio, UserRound } from "lucide-react";
 import { getExchangeCopy, localeFromPathname, localePath, stripLocale } from "@/components/acg-locale";
 import { cn } from "@/lib/utils";
 
 const desktopNav = [
   { href: "/", key: "home" },
   { href: "/market", key: "market" },
+  { href: "/campaigns", key: "campaigns" },
+  { href: "/gallery", key: "gallery" },
   { href: "/comfort", key: "comfort" },
   { href: "/shop", key: "shop" },
-  { href: "/work", key: "work" },
   { href: "/me", key: "me" },
 ] as const;
 
 const mobileNav = [
-  { href: "/", key: "home", icon: Home },
   { href: "/market", key: "market", icon: Radio },
+  { href: "/campaigns", key: "campaigns", icon: Flag },
   { href: "/comfort", key: "comfort", icon: Heart },
-  { href: "/shop", key: "shop", icon: ShoppingBag },
+  { href: "/gallery", key: "gallery", icon: Images },
   { href: "/me", key: "me", icon: UserRound },
 ] as const;
 
-export function SiteHeader() {
+export function SiteHeader({ signedIn = false, viewerName }: { signedIn?: boolean; viewerName?: string | null }) {
   const pathname = usePathname();
   const locale = localeFromPathname(pathname);
   const copy = getExchangeCopy(locale);
@@ -48,7 +49,7 @@ export function SiteHeader() {
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
+          <nav className="hidden items-center gap-1 xl:flex" aria-label="Primary navigation">
             {desktopNav.map((item) => (
               <Link
                 key={item.href}
@@ -77,14 +78,14 @@ export function SiteHeader() {
                 </Link>
               ))}
             </div>
-            <Link href="/api/auth/signin" className="exchange-signin hidden sm:inline-flex">
-              {copy.common.signIn}
+            <Link href={signedIn ? localePath(locale, "/me") : "/api/auth/signin"} className="exchange-signin hidden sm:inline-flex">
+              {signedIn ? viewerName ?? copy.nav.me : copy.common.signIn}
             </Link>
           </div>
         </div>
       </header>
 
-      <nav className="mobile-bottom-nav lg:hidden" aria-label="Mobile navigation">
+      <nav className="mobile-bottom-nav xl:hidden" aria-label="Mobile navigation">
         {mobileNav.map((item) => {
           const Icon = item.icon;
           return (

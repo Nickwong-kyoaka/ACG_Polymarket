@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, HeartHandshake, MoonStar, Sparkles } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, HeartHandshake, MoonStar } from "lucide-react";
 import { localePath, pick, type PublicLocale } from "@/components/acg-locale";
 import type { ComfortContent, ComfortMode } from "@/lib/types";
 
@@ -71,5 +72,5 @@ export function MiniComic({ mode, locale }: { mode: ComfortMode; locale: PublicL
     "One gentle line lands on the desk with your name on it.",
     "The final panel does not rush you: tomorrow is allowed.",
   ];
-  return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{panels.map((line, index) => <article key={line} className="exchange-panel overflow-hidden"><div className="relative h-44 p-4 text-white" style={{ background: `linear-gradient(${125 + index * 10}deg, ${mode.accentFrom}, ${mode.accentTo})` }}><div className="halftone absolute inset-0 opacity-35" /><span className="relative text-6xl font-black text-white/22">0{index + 1}</span><Sparkles className="absolute right-5 top-5 h-6 w-6 text-white/70" /></div><p className="p-5 text-sm leading-7 text-slate-600">{line}</p></article>)}</div>;
+  return <figure className="exchange-panel overflow-hidden bg-[#111827]"><Image src={`/assets/comfort/comfort-four-panel-${locale}.svg`} alt={locale === "zh-Hant" ? "原創四格安慰漫畫：走進房間、降低雜音、收到溫柔訊息，最後把明天留給明天。" : "Original four-panel comfort comic about entering, quieting the noise, receiving kindness, and leaving tomorrow for tomorrow."} width={1600} height={900} className="h-auto w-full" unoptimized /><figcaption className="sr-only">{panels.join(" ")}</figcaption></figure>;
 }

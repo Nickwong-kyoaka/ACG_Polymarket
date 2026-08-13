@@ -52,10 +52,77 @@ enum AssetWorkflowStatus {
 }
 
 enum AssetSourceKind {
+  PLATFORM_ORIGINAL
   AI_GENERATED
   USER_PROVIDED
+  FAN_ART
+  OPEN_LICENSE
   BANGUMI_METADATA
   OFFICIAL_REFERENCE
+}
+
+enum AssetPermissionStatus {
+  VERIFIED
+  CREATOR_GRANTED
+  UNVERIFIED
+  REJECTED
+  TAKEDOWN_REQUESTED
+}
+
+enum ContentRating {
+  UNRATED
+  SFW
+  SUGGESTIVE
+  NSFW
+}
+
+enum AssetDerivativeKind {
+  THUMBNAIL
+  CARD
+  HERO
+  WALLPAPER
+}
+
+enum AssetAuditAction {
+  CREATED
+  METADATA_UPDATED
+  RIGHTS_REVIEWED
+  PUBLISHED
+  PULLED
+  TAKEDOWN_REQUESTED
+  TAKEDOWN_RESOLVED
+}
+
+enum TakedownStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum CampaignRewardKind {
+  BADGE
+  SHOP_ITEM
+  COMFORT_CONTENT
+}
+
+enum MarketAlertKind {
+  QUOTE_ABOVE
+  QUOTE_BELOW
+  CAMPAIGN_MILESTONE
+  SUPPORT_ACTIVITY
 }
 
 enum CurrencyType {
@@ -120,32 +187,36 @@ enum SourceKind {
 }
 
 model User {
-  id               String                 @id @default(cuid())
-  email            String?                @unique
-  name             String?
-  image            String?
-  role             UserRole               @default(USER)
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  authIdentities   AuthIdentity[]
-  sessions         Session[]
-  profile          Profile?
-  wallet           Wallet?
-  positions        SupportPosition[]
-  trades           Trade[]
-  dailyRewards     DailyRewardClaim[]
-  adRewards        AdRewardClaim[]
-  watchlistItems   WatchlistItem[]
-  comments         Comment[]
-  reactions        Reaction[]
-  reports          Report[]
-  notifications    Notification[]
-  inventoryItems   InventoryItem[]
-  comfortSessions  ComfortSession[]
-  comfortReactions ComfortReaction[]
-  idempotency      IdempotencyRecord[]
-  missionProgress  DailyMissionProgress[]
-  workShifts       WorkShift[]
+  id                    String                 @id @default(cuid())
+  email                 String?                @unique
+  name                  String?
+  image                 String?
+  role                  UserRole               @default(USER)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  authIdentities        AuthIdentity[]
+  sessions              Session[]
+  profile               Profile?
+  wallet                Wallet?
+  positions             SupportPosition[]
+  trades                Trade[]
+  dailyRewards          DailyRewardClaim[]
+  adRewards             AdRewardClaim[]
+  watchlistItems        WatchlistItem[]
+  comments              Comment[]
+  reactions             Reaction[]
+  reports               Report[]
+  notifications         Notification[]
+  inventoryItems        InventoryItem[]
+  comfortSessions       ComfortSession[]
+  comfortReactions      ComfortReaction[]
+  idempotency           IdempotencyRecord[]
+  missionProgress       DailyMissionProgress[]
+  workShifts            WorkShift[]
+  campaignContributions CampaignContribution[]
+  marketAlerts          MarketAlert[]
+  assetAuditLogs        AssetAuditLog[]
+  takedownRequests      TakedownRequest[]
 }
 
 model AuthIdentity {
@@ -227,6 +298,7 @@ model Character {
   unitsPerStep        Int
   circulatingUnits    Int                       @default(0)
   supporterCount      Int                       @default(0)
+  marketVersion       Int                       @default(0)
   isFeatured          Boolean                   @default(false)
   accentFrom          String                    @default("#64748b")
   accentTo            String                    @default("#cbd5e1")
@@ -253,6 +325,8 @@ model Character {
   comfortSessions     ComfortSession[]
   locales             CharacterLocale[]
   workShifts          WorkShift[]
+  supportCampaigns    SupportCampaign[]
+  marketAlerts        MarketAlert[]
 }
 
 model CharacterLocale {
@@ -323,31 +397,116 @@ model CharacterAttributeValue {
 }
 
 model CharacterAsset {
-  id              String              @id @default(cuid())
-  characterId     String?
-  kind            AssetKind
-  label           String
-  storageKey      String
+  id                   String                 @id @default(cuid())
+  characterId          String?
+  kind                 AssetKind
+  label                String
+  storageKey           String
+  altText              String
+  workflowStatus       AssetWorkflowStatus    @default(UPLOADED)
+  publishedAt          DateTime?
+  version              Int                    @default(1)
+  metadata             Json?
+  rightsGrantId        String?
+  sourceKind           AssetSourceKind        @default(USER_PROVIDED)
+  sourceUrl            String?
+  attributionText      String?
+  takedownContact      String?
+  sourceLabel          String?
+  licenseName          String?
+  publicUrl            String?
+  mimeType             String?
+  byteSize             Int?
+  aiPrompt             String?
+  aiModel              String?
+  permissionStatus     AssetPermissionStatus  @default(UNVERIFIED)
+  contentRating        ContentRating          @default(UNRATED)
+  creatorName          String?
+  creatorUrl           String?
+  originalMediaUrl     String?
+  licenseUrl           String?
+  permissionEvidence   String?
+  commercialUseAllowed Boolean                @default(false)
+  adaptationAllowed    Boolean                @default(false)
+  retrievedAt          DateTime?
+  checksum             String?                @unique
+  reviewedById         String?
+  reviewedAt           DateTime?
+  reviewNotes          String?
+  riskAcknowledgedById String?
+  riskAcknowledgedAt   DateTime?
+  primaryPriority      Int                    @default(0)
+  character            Character?             @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  rightsGrant          RightsGrant?           @relation(fields: [rightsGrantId], references: [id])
+  comfortContents      ComfortContent[]
+  derivatives          AssetDerivative[]
+  locales              CharacterAssetLocale[]
+  auditLogs            AssetAuditLog[]
+  takedownRequests     TakedownRequest[]
+
+  @@index([characterId, workflowStatus, primaryPriority])
+  @@index([permissionStatus, contentRating])
+}
+
+model AssetDerivative {
+  id         String              @id @default(cuid())
+  assetId    String
+  kind       AssetDerivativeKind
+  storageKey String
+  publicUrl  String
+  mimeType   String
+  width      Int
+  height     Int
+  byteSize   Int
+  checksum   String              @unique
+  createdAt  DateTime            @default(now())
+  asset      CharacterAsset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, kind])
+}
+
+model CharacterAssetLocale {
+  id              String         @id @default(cuid())
+  assetId         String
+  locale          LocaleCode
   altText         String
-  workflowStatus  AssetWorkflowStatus @default(UPLOADED)
-  publishedAt     DateTime?
-  version         Int                 @default(1)
-  metadata        Json?
-  rightsGrantId   String?
-  sourceKind      AssetSourceKind     @default(USER_PROVIDED)
-  sourceUrl       String?
+  caption         String?
   attributionText String?
-  takedownContact String?
-  sourceLabel     String?
-  licenseName     String?
-  publicUrl       String?
-  mimeType        String?
-  byteSize        Int?
-  aiPrompt        String?
-  aiModel         String?
-  character       Character?          @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  rightsGrant     RightsGrant?        @relation(fields: [rightsGrantId], references: [id])
-  comfortContents ComfortContent[]
+  asset           CharacterAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, locale])
+}
+
+model AssetAuditLog {
+  id          String           @id @default(cuid())
+  assetId     String
+  actorUserId String?
+  action      AssetAuditAction
+  detail      Json?
+  createdAt   DateTime         @default(now())
+  asset       CharacterAsset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  actor       User?            @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([assetId, createdAt])
+}
+
+model TakedownRequest {
+  id              String         @id @default(cuid())
+  assetId         String
+  requesterUserId String?
+  requesterName   String?
+  requesterEmail  String
+  reason          String
+  evidenceUrl     String?
+  status          TakedownStatus @default(OPEN)
+  resolutionNotes String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  asset           CharacterAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  requester       User?          @relation(fields: [requesterUserId], references: [id], onDelete: SetNull)
+
+  @@index([assetId, status])
+  @@index([status, createdAt])
 }
 
 model RightsGrant {
@@ -421,16 +580,106 @@ model SupportPosition {
 }
 
 model Trade {
-  id          String    @id @default(cuid())
-  userId      String
-  characterId String
-  side        String
-  quantity    Int
-  totalCost   Int
-  unitPrice   Int
-  createdAt   DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  id               String    @id @default(cuid())
+  userId           String
+  characterId      String
+  side             TradeSide
+  quantity         Int
+  totalCost        Int
+  unitPrice        Int
+  quoteBefore      Int
+  quoteAfter       Int
+  supplyBefore     Int
+  supplyAfter      Int
+  firstUnitPrice   Int
+  lastUnitPrice    Int
+  averageUnitPrice Int
+  marketVersion    Int
+  idempotencyKey   String    @unique
+  createdAt        DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character        Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([characterId, createdAt])
+  @@index([characterId, side, createdAt])
+}
+
+model SupportCampaign {
+  id            String                  @id @default(cuid())
+  characterId   String
+  slug          String                  @unique
+  status        CampaignStatus          @default(DRAFT)
+  title         String
+  description   String
+  goalUnits     Int
+  currentUnits  Int                     @default(0)
+  startsAt      DateTime
+  endsAt        DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  character     Character               @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  locales       SupportCampaignLocale[]
+  contributions CampaignContribution[]
+  rewards       SupportCampaignReward[]
+
+  @@index([status, startsAt, endsAt])
+  @@index([characterId, status])
+}
+
+model SupportCampaignLocale {
+  id          String          @id @default(cuid())
+  campaignId  String
+  locale      LocaleCode
+  title       String
+  description String
+  campaign    SupportCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, locale])
+}
+
+model CampaignContribution {
+  id                String          @id @default(cuid())
+  campaignId        String
+  userId            String
+  units             Int             @default(0)
+  badgeLevel        Int             @default(0)
+  lastContributedAt DateTime        @default(now())
+  createdAt         DateTime        @default(now())
+  campaign          SupportCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId])
+  @@index([userId, lastContributedAt])
+}
+
+model SupportCampaignReward {
+  id             String             @id @default(cuid())
+  campaignId     String
+  thresholdUnits Int
+  kind           CampaignRewardKind
+  label          String
+  referenceId    String?
+  campaign       SupportCampaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, thresholdUnits, kind])
+}
+
+model MarketAlert {
+  id              String          @id @default(cuid())
+  userId          String
+  characterId     String
+  kind            MarketAlertKind
+  thresholdValue  Int?
+  active          Boolean         @default(true)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character       Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, characterId, kind, thresholdValue])
+  @@index([characterId, active, kind])
+  @@index([userId, active])
 }
 
 model DailyRewardClaim {

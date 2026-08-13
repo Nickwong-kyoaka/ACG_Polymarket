@@ -1,4 +1,5 @@
 import type { Character, ShopItem } from "@/lib/types";
+import { catalogCharactersV2, catalogSeriesV2 } from "@/data/catalog-v2";
 
 export const publicLocales = ["en", "zh-Hant"] as const;
 
@@ -34,6 +35,15 @@ export function localeFromPathname(pathname: string): PublicLocale {
 
 export function pick<T>(locale: PublicLocale, english: T, chinese: T): T {
   return locale === "zh-Hant" ? chinese : english;
+}
+
+export function localizeReleaseSeason(value: string, locale: PublicLocale) {
+  if (locale === "en") return value;
+  return value
+    .replace(/SPRING/gi, "春季")
+    .replace(/SUMMER/gi, "夏季")
+    .replace(/AUTUMN|FALL/gi, "秋季")
+    .replace(/WINTER/gi, "冬季");
 }
 
 const characterCopy: Record<
@@ -123,6 +133,21 @@ const characterCopy: Record<
 };
 
 export function localizeCharacter(character: Character, locale: PublicLocale): Character {
+  const catalog = catalogCharactersV2.find((entry) => entry.slug === character.slug);
+  if (catalog) {
+    const series = catalogSeriesV2.find((entry) => entry.slug === catalog.seriesSlug);
+    return {
+      ...character,
+      name: catalog.name[locale],
+      title: catalog.headline[locale],
+      summary: catalog.summary[locale],
+      fandomPrompt: catalog.fandomPrompt[locale],
+      mood: catalog.comfortStyle[locale],
+      tags: catalog.tags[locale],
+      sourceTitle: series?.title[locale] ?? character.sourceTitle,
+      favoritePhrase: catalog.fandomPrompt[locale],
+    };
+  }
   return { ...character, ...(characterCopy[character.slug]?.[locale] ?? {}) };
 }
 
@@ -185,7 +210,7 @@ export function formatHongKongDate(value: string, locale: PublicLocale) {
 
 export const exchangeCopy = {
   en: {
-    nav: { home: "Lobby", market: "Signals", comfort: "Comfort", shop: "Booth", work: "Work", me: "My room" },
+    nav: { home: "Lobby", market: "Signals", campaigns: "Campaigns", gallery: "Gallery", comfort: "Comfort", shop: "Booth", work: "Work", me: "My room" },
     common: { original: "Original IP", metadata: "Metadata signal", quote: "Support quote", supporters: "Supporters", comments: "Messages", units: "units", open: "Enter signal", watch: "Watch", watching: "Watching", signIn: "Sign in", sup: "SUP" },
     trade: { title: "Support ticket", buyQuote: "Buy quote", sellQuote: "Return quote", balance: "Wallet", held: "Held", quantity: "Units", buy: "Send support", sell: "Return units", notice: "System exchange only. No shorting, P2P orders, cash-out, or character-versus-character bets.", failed: "The exchange could not complete this action.", bought: "Support sent successfully.", sold: "Units returned successfully.", signIn: "Sign in to send support" },
     rewards: { title: "Daily energy", daily: "Claim +100", ad: "Rewarded ad +20", dailyDone: "Daily SUP received.", adDone: "Rewarded SUP received.", failed: "Reward could not be claimed." },
@@ -193,7 +218,7 @@ export const exchangeCopy = {
     comments: { placeholder: "Write what you love about this character...", post: "Leave a message", posted: "Your message joined the support wall.", failed: "Message could not be posted.", reactFailed: "Reaction could not be sent.", supporter: "Supporter", guest: "guest", cheer: "Cheer", heart: "Heart", hype: "Spark" },
   },
   "zh-Hant": {
-    nav: { home: "大廳", market: "訊號", comfort: "安慰室", shop: "攤位", work: "打工", me: "我的房間" },
+    nav: { home: "大廳", market: "訊號", campaigns: "應援活動", gallery: "畫廊", comfort: "安慰室", shop: "攤位", work: "打工", me: "我的房間" },
     common: { original: "原創 IP", metadata: "資料型訊號", quote: "目前應援價", supporters: "應援者", comments: "留言", units: "份", open: "進入角色訊號", watch: "關注", watching: "關注中", signIn: "登入", sup: "SUP" },
     trade: { title: "應援票券", buyQuote: "支持價格", sellQuote: "退回價格", balance: "錢包", held: "持有", quantity: "份數", buy: "送出應援", sell: "退回份數", notice: "只與系統交換，不設做空、玩家配對、出金或角色對賭。", failed: "交易站未能完成這次操作。", bought: "應援已成功送達。", sold: "應援份數已退回。", signIn: "登入後送出應援" },
     rewards: { title: "每日能量", daily: "簽到 +100", ad: "獎勵廣告 +20", dailyDone: "今天的 SUP 已入帳。", adDone: "廣告獎勵 SUP 已入帳。", failed: "暫時無法領取獎勵。" },

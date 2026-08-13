@@ -70,7 +70,7 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
               <div className="rounded-[20px_5px_20px_5px] border border-white/10 bg-white/6 p-5">
                 <p className="text-[10px] font-black uppercase tracking-[.2em] text-white/45">{copy.live}</p>
                 <p className="mt-2 font-display text-2xl">{hero.name}</p>
-                <p className="mt-2 text-xs text-white/50">{hero.supporterCount} supporters · {hero.circulatingUnits} units</p>
+                <p className="mt-2 text-xs text-white/50">{hero.supporterCount} {pick(locale, "supporters", "位應援者")} · {hero.circulatingUnits} {pick(locale, "units", "份應援")}</p>
               </div>
             </div>
           </div>
@@ -97,7 +97,7 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
               {[
                 { icon: CheckCircle2, en: "Daily check-in", zh: "每日簽到", reward: "+100 SUP", href: "/me" },
                 { icon: BriefcaseBusiness, en: "Character work", zh: "角色打工", reward: "+10–60 SUP", href: "/work" },
-                { icon: HeartHandshake, en: "Comfort session", zh: "完成安慰流程", reward: "+10 mission", href: "/comfort" },
+                { icon: HeartHandshake, en: "Comfort session", zh: "完成安慰流程", reward: pick(locale, "+10 mission SUP", "+10 任務 SUP"), href: "/comfort" },
               ].map((mission) => <Link key={mission.en} href={localePath(locale, mission.href)} className="group rounded-[20px_5px_20px_5px] border border-black/10 bg-[#f5f1e8] p-5 transition hover:-translate-y-1 hover:border-[#ff4e72]"><mission.icon className="h-6 w-6 text-[#e83c62]" /><h3 className="mt-5 font-display text-2xl">{pick(locale, mission.en, mission.zh)}</h3><p className="mt-2 text-sm font-black text-[#19757a]">{mission.reward}</p></Link>)}
             </div>
           </div>

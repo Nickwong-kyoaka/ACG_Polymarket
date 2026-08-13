@@ -8,10 +8,11 @@ import {
 import { bangumiImportSamples } from "@/data/bangumi-samples";
 import { comfortContents, comfortModes } from "@/data/comfort";
 import type { SeedSnapshot } from "@/lib/types";
+import { buildSeedSnapshotV2 } from "@/data/seed-v2";
 
 const now = new Date("2026-03-25T10:00:00.000Z").toISOString();
 
-export const seedSnapshot: SeedSnapshot = {
+const legacySeedSnapshot: SeedSnapshot = {
   users: [
     {
       id: "viewer-001",
@@ -941,3 +942,5 @@ export const seedSnapshot: SeedSnapshot = {
   comfortModes,
   comfortContents,
 };
+
+export const seedSnapshot = buildSeedSnapshotV2(legacySeedSnapshot);

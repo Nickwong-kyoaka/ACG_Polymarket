@@ -2,6 +2,7 @@ import { seedSnapshot } from "../data/seed";
 import { prisma } from "./prisma";
 import type { SeedSnapshot } from "./types";
 import { localizeCharacter, localizeShopItem } from "@/components/acg-locale";
+import { catalogCharactersV2, catalogSeriesV2 } from "@/data/catalog-v2";
 
 type SeedClient = typeof prisma;
 
@@ -121,7 +122,10 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         bangumiUrl: series.bangumiUrl,
       },
     });
-    const zh = seriesZhHant[series.id] ?? { title: series.title, summary: series.summary };
+    const catalogSeries = catalogSeriesV2.find((entry) => entry.slug === series.slug);
+    const zh = catalogSeries
+      ? { title: catalogSeries.title["zh-Hant"], summary: `收錄 ${catalogSeries.title["zh-Hant"]} 角色的正向應援訊號，不包含現金交易或對立排行。` }
+      : seriesZhHant[series.id] ?? { title: series.title, summary: series.summary };
     await db.seriesLocale.upsert({
       where: { seriesId_locale: { seriesId: series.id, locale: "EN" } },
       create: { seriesId: series.id, locale: "EN", title: series.title, summary: series.summary },
@@ -208,6 +212,7 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         unitsPerStep: character.unitsPerStep,
         circulatingUnits: character.circulatingUnits,
         supporterCount: character.supporterCount,
+        marketVersion: character.marketVersion ?? 0,
         isFeatured: character.isFeatured,
         accentFrom: character.accentFrom,
         accentTo: character.accentTo,
@@ -233,6 +238,7 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         unitsPerStep: character.unitsPerStep,
         circulatingUnits: character.circulatingUnits,
         supporterCount: character.supporterCount,
+        marketVersion: character.marketVersion ?? 0,
         isFeatured: character.isFeatured,
         accentFrom: character.accentFrom,
         accentTo: character.accentTo,
@@ -369,6 +375,28 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         sourceUrl: asset.sourceUrl,
         attributionText: asset.attributionText,
         takedownContact: asset.takedownContact,
+        sourceLabel: asset.sourceLabel,
+        licenseName: asset.licenseName,
+        publicUrl: asset.publicUrl,
+        mimeType: asset.mimeType,
+        byteSize: asset.byteSize,
+        aiPrompt: asset.aiPrompt,
+        aiModel: asset.aiModel,
+        permissionStatus: asset.permissionStatus ?? "UNVERIFIED",
+        contentRating: asset.contentRating ?? "UNRATED",
+        creatorName: asset.creatorName,
+        creatorUrl: asset.creatorUrl,
+        originalMediaUrl: asset.originalMediaUrl,
+        licenseUrl: asset.licenseUrl,
+        permissionEvidence: asset.permissionEvidence,
+        commercialUseAllowed: asset.commercialUseAllowed ?? false,
+        adaptationAllowed: asset.adaptationAllowed ?? false,
+        retrievedAt: asDate(asset.retrievedAt),
+        checksum: asset.checksum,
+        reviewedAt: asDate(asset.reviewedAt),
+        reviewNotes: asset.reviewNotes,
+        riskAcknowledgedAt: asDate(asset.riskAcknowledgedAt),
+        primaryPriority: asset.primaryPriority ?? 0,
       },
       update: {
         characterId: asset.characterId,
@@ -385,8 +413,38 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         sourceUrl: asset.sourceUrl,
         attributionText: asset.attributionText,
         takedownContact: asset.takedownContact,
+        sourceLabel: asset.sourceLabel,
+        licenseName: asset.licenseName,
+        publicUrl: asset.publicUrl,
+        mimeType: asset.mimeType,
+        byteSize: asset.byteSize,
+        aiPrompt: asset.aiPrompt,
+        aiModel: asset.aiModel,
+        permissionStatus: asset.permissionStatus ?? "UNVERIFIED",
+        contentRating: asset.contentRating ?? "UNRATED",
+        creatorName: asset.creatorName,
+        creatorUrl: asset.creatorUrl,
+        originalMediaUrl: asset.originalMediaUrl,
+        licenseUrl: asset.licenseUrl,
+        permissionEvidence: asset.permissionEvidence,
+        commercialUseAllowed: asset.commercialUseAllowed ?? false,
+        adaptationAllowed: asset.adaptationAllowed ?? false,
+        retrievedAt: asDate(asset.retrievedAt),
+        checksum: asset.checksum,
+        reviewedAt: asDate(asset.reviewedAt),
+        reviewNotes: asset.reviewNotes,
+        riskAcknowledgedAt: asDate(asset.riskAcknowledgedAt),
+        primaryPriority: asset.primaryPriority ?? 0,
       },
     });
+    if (asset.characterId) {
+      const catalog = catalogCharactersV2.find((entry) => `char-${entry.slug}` === asset.characterId || ({ "akari-hoshino": "char-akari", "ren-tsukishiro": "char-ren", "mira-kagetsu": "char-mira", "yatogami-tohka": "char-tohka", "tokisaki-kurumi": "char-kurumi" }[entry.slug] === asset.characterId));
+      if (catalog) {
+        for (const [locale, altText] of [["EN", asset.altText], ["ZH_HANT", `${catalog.name["zh-Hant"]} 的${catalog.seriesSlug === "starlit-cadence" ? "平台原創 AI 主視覺" : "抽象應援訊號立繪；未內含第三方角色圖片"}。`]] as const) {
+          await db.characterAssetLocale.upsert({ where: { assetId_locale: { assetId: asset.id, locale } }, create: { assetId: asset.id, locale, altText }, update: { altText } });
+        }
+      }
+    }
   }
 
   for (const collection of snapshot.shopCollections) {
@@ -459,7 +517,22 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
     await db.trade.upsert({
       where: { id: trade.id },
       create: {
-        ...trade,
+        id: trade.id,
+        userId: trade.userId,
+        characterId: trade.characterId,
+        side: trade.side,
+        quantity: trade.quantity,
+        totalCost: trade.totalCost,
+        unitPrice: trade.unitPrice,
+        quoteBefore: trade.quoteBefore ?? trade.unitPrice,
+        quoteAfter: trade.quoteAfter ?? trade.unitPrice,
+        supplyBefore: trade.supplyBefore ?? 0,
+        supplyAfter: trade.supplyAfter ?? trade.quantity,
+        firstUnitPrice: trade.firstUnitPrice ?? trade.unitPrice,
+        lastUnitPrice: trade.lastUnitPrice ?? trade.unitPrice,
+        averageUnitPrice: trade.averageUnitPrice ?? trade.unitPrice,
+        marketVersion: trade.marketVersion ?? 0,
+        idempotencyKey: trade.idempotencyKey ?? `seed-${trade.id}`,
         createdAt: new Date(trade.createdAt),
       },
       update: {
@@ -467,6 +540,15 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         quantity: trade.quantity,
         totalCost: trade.totalCost,
         unitPrice: trade.unitPrice,
+        quoteBefore: trade.quoteBefore ?? trade.unitPrice,
+        quoteAfter: trade.quoteAfter ?? trade.unitPrice,
+        supplyBefore: trade.supplyBefore ?? 0,
+        supplyAfter: trade.supplyAfter ?? trade.quantity,
+        firstUnitPrice: trade.firstUnitPrice ?? trade.unitPrice,
+        lastUnitPrice: trade.lastUnitPrice ?? trade.unitPrice,
+        averageUnitPrice: trade.averageUnitPrice ?? trade.unitPrice,
+        marketVersion: trade.marketVersion ?? 0,
+        idempotencyKey: trade.idempotencyKey ?? `seed-${trade.id}`,
       },
     });
   }
@@ -656,5 +738,29 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
       create: { contentId: content.id, locale: "ZH_HANT", title: zh[0], body: zh[1] },
       update: { title: zh[0], body: zh[1] },
     });
+  }
+
+  if (snapshot.characters.length === 24) {
+    const startsAt = new Date("2026-07-13T08:00:00.000Z");
+    const endsAt = new Date("2026-12-31T15:59:59.000Z");
+    for (const catalog of catalogCharactersV2) {
+      const character = snapshot.characters.find((entry) => entry.slug === catalog.slug)!;
+      const campaignId = `campaign-${catalog.slug}`;
+      const campaign = await db.supportCampaign.upsert({
+        where: { slug: `${catalog.slug}-shared-signal` },
+        create: { id: campaignId, characterId: character.id, slug: `${catalog.slug}-shared-signal`, status: "ACTIVE", title: `${catalog.name.en} Shared Signal`, description: catalog.fandomPrompt.en, goalUnits: catalog.market.campaignGoal, currentUnits: character.circulatingUnits, startsAt, endsAt },
+        update: { characterId: character.id, status: "ACTIVE", title: `${catalog.name.en} Shared Signal`, description: catalog.fandomPrompt.en, goalUnits: catalog.market.campaignGoal, currentUnits: character.circulatingUnits, startsAt, endsAt },
+      });
+      for (const [locale, title, description] of [["EN", `${catalog.name.en} Shared Signal`, catalog.fandomPrompt.en], ["ZH_HANT", `${catalog.name["zh-Hant"]}共同應援`, catalog.fandomPrompt["zh-Hant"]]] as const) {
+        await db.supportCampaignLocale.upsert({ where: { campaignId_locale: { campaignId: campaign.id, locale } }, create: { campaignId: campaign.id, locale, title, description }, update: { title, description } });
+      }
+      const rewards = [
+        { thresholdUnits: Math.ceil(catalog.market.campaignGoal * 0.25), kind: "BADGE" as const, label: "Spark Badge／星光徽章", referenceId: null },
+        { thresholdUnits: Math.ceil(catalog.market.campaignGoal * 0.5), kind: "SHOP_ITEM" as const, label: "Wallpaper Drop／壁紙解鎖", referenceId: "shop-wallpaper-comfort-archive" },
+        { thresholdUnits: catalog.market.campaignGoal, kind: "COMFORT_CONTENT" as const, label: "Comfort Story／安慰故事", referenceId: null },
+      ];
+      for (const reward of rewards) await db.supportCampaignReward.upsert({ where: { campaignId_thresholdUnits_kind: { campaignId: campaign.id, thresholdUnits: reward.thresholdUnits, kind: reward.kind } }, create: { campaignId: campaign.id, ...reward }, update: { label: reward.label, referenceId: reward.referenceId } });
+      await db.campaignContribution.upsert({ where: { campaignId_userId: { campaignId: campaign.id, userId: "community-seed-001" } }, create: { campaignId: campaign.id, userId: "community-seed-001", units: character.circulatingUnits, badgeLevel: character.circulatingUnits >= 25 ? 2 : 1, lastContributedAt: new Date("2026-08-13T08:00:00.000Z") }, update: { units: character.circulatingUnits, badgeLevel: character.circulatingUnits >= 25 ? 2 : 1, lastContributedAt: new Date("2026-08-13T08:00:00.000Z") } });
+    }
   }
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Database, FileHeart, Images, LayoutDashboard, ShoppingBag } from "lucide-react";
+import { Database, FileHeart, FlagTriangleRight, Images, LayoutDashboard, ShieldAlert, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const adminLinks = [
@@ -11,6 +11,8 @@ const adminLinks = [
   { href: "/admin/imports", label: "Bangumi imports", short: "Imports", icon: Database },
   { href: "/admin/assets", label: "Asset workflow", short: "Assets", icon: Images },
   { href: "/admin/shop", label: "Shop catalog", short: "Shop", icon: ShoppingBag },
+  { href: "/admin/campaigns", label: "Campaign control", short: "Campaigns", icon: FlagTriangleRight },
+  { href: "/admin/takedowns", label: "Takedown queue", short: "Safety", icon: ShieldAlert },
 ] as const;
 
 export function AdminNav() {
