@@ -2,12 +2,13 @@ import { apiOk, handleApiError } from "@/lib/api";
 import { getCharacterView } from "@/lib/store";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ identifier: string }> },
 ) {
   try {
     const { identifier } = await params;
-    return apiOk({ item: await getCharacterView(identifier) });
+    const locale = new URL(request.url).searchParams.get("locale") === "zh-Hant" ? "zh-Hant" : "en";
+    return apiOk({ item: await getCharacterView(identifier, locale) });
   } catch (error) {
     return handleApiError(error);
   }

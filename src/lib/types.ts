@@ -1,11 +1,15 @@
 export type RightsType = "ORIGINAL" | "LICENSED";
+export type PublishStatus = "DRAFT" | "RIGHTS_CHECKED" | "REVIEWED" | "PUBLISHED" | "ARCHIVED";
 export type AssetKind =
   | "HERO"
   | "CARD"
   | "THUMB"
   | "WALLPAPER"
   | "AVATAR_FRAME"
-  | "PROFILE_THEME";
+  | "PROFILE_THEME"
+  | "VOICE"
+  | "ASMR"
+  | "COMIC";
 export type AssetWorkflowStatus =
   | "UPLOADED"
   | "NORMALIZED"
@@ -24,6 +28,8 @@ export type LedgerReferenceType =
   | "STARTER_GRANT"
   | "DAILY_REWARD"
   | "AD_REWARD"
+  | "MISSION_REWARD"
+  | "WORK_REWARD"
   | "BUY_SUPPORT"
   | "SELL_SUPPORT"
   | "SHOP_PURCHASE";
@@ -145,6 +151,13 @@ export interface CharacterAsset {
   sourceUrl?: string;
   attributionText?: string;
   takedownContact?: string;
+  sourceLabel?: string;
+  licenseName?: string;
+  publicUrl?: string;
+  mimeType?: string;
+  byteSize?: number;
+  aiPrompt?: string;
+  aiModel?: string;
 }
 
 export interface Character {
@@ -158,6 +171,7 @@ export interface Character {
   mood: string;
   rightsType: RightsType;
   metadataOnly: boolean;
+  publishStatus?: PublishStatus;
   basePrice: number;
   priceStep: number;
   unitsPerStep: number;
@@ -211,6 +225,9 @@ export interface AdRewardClaim {
   userId: string;
   dayKey: string;
   amount: number;
+  slot: number;
+  provider?: string;
+  proofId?: string;
   claimedAt: string;
 }
 
@@ -226,6 +243,7 @@ export interface Comment {
   userId: string;
   characterId: string;
   content: string;
+  status?: "VISIBLE" | "HELD" | "REMOVED";
   createdAt: string;
 }
 
@@ -244,6 +262,8 @@ export interface Report {
   commentId?: string;
   reason: string;
   detail?: string;
+  status?: "OPEN" | "REVIEWING" | "RESOLVED" | "DISMISSED";
+  resolution?: string;
   createdAt: string;
 }
 
@@ -343,10 +363,35 @@ export interface ComfortContent {
   title: string;
   body: string;
   mediaUrl?: string;
+  assetId?: string;
   sweetnessLevel: number;
   unlockShopItemId?: string;
   published: boolean;
   metadata?: Record<string, string | number | boolean>;
+}
+
+export type MissionKey = "COMFORT_SESSION" | "POSITIVE_REACTION" | "SUPPORT_OR_WATCH";
+export type WorkKind = "SHIFT_30M" | "SHIFT_2H" | "SHIFT_6H";
+export type WorkStatus = "ACTIVE" | "READY" | "CLAIMED" | "CANCELLED";
+
+export interface DailyMissionView {
+  key: MissionKey;
+  reward: number;
+  title: string;
+  description: string;
+  completed: boolean;
+  claimed: boolean;
+}
+
+export interface WorkShiftView {
+  id: string;
+  kind: WorkKind;
+  status: WorkStatus;
+  reward: number;
+  characterId?: string;
+  startedAt: string;
+  endsAt: string;
+  claimedAt?: string;
 }
 
 export interface ComfortModeView extends ComfortMode {

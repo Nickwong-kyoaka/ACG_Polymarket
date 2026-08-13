@@ -1,6 +1,7 @@
 import { seedSnapshot } from "../data/seed";
 import { prisma } from "./prisma";
 import type { SeedSnapshot } from "./types";
+import { localizeCharacter, localizeShopItem } from "@/components/acg-locale";
 
 type SeedClient = typeof prisma;
 
@@ -11,6 +12,53 @@ function asDate(value?: string) {
 function jsonValue(value: unknown) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
+
+const seriesZhHant: Record<string, { title: string; summary: string }> = {
+  "series-starlit": {
+    title: "星光節拍",
+    summary: "為 ACG 應援市場打造的原創角色企劃，以舞台、音樂與溫柔陪伴連結粉絲。",
+  },
+  "series-archive": {
+    title: "檔案館示範企劃",
+    summary: "展示資料來源、權利標記與安全素材流程的資料型作品。",
+  },
+  "series-date-a-live": {
+    title: "約會大作戰",
+    summary: "以 Bangumi 資料與來源標記建立的角色應援示範，不包含未獲授權的官方媒體。",
+  },
+  "series-bangumi-2026-summer": {
+    title: "Bangumi 2026 夏季番訊號",
+    summary: "以資料卡方式展示 2026 夏季作品與熱門訊號。",
+  },
+};
+
+const attributeZhHant: Record<string, string> = {
+  sweetness: "甜度",
+  comfort_style: "安慰風格",
+  voice_tone: "聲線",
+  archetype: "角色類型",
+  asmr_tags: "ASMR 標籤",
+  source_title: "來源作品",
+  release_season: "播出季度",
+};
+
+const comfortModeZhHant: Record<string, [string, string, string, string]> = {
+  loneliness: ["孤單陪伴室", "有人在你這邊", "房間太安靜時，讓角色在身邊坐一會。", "我現在不想一個人"],
+  stress: ["壓力融化室", "先把呼吸拿回來", "用短句、慢節奏與柔和應援卸下今天的壓力。", "我壓力很大，想先平靜下來"],
+  "study-fatigue": ["讀書充電站", "今天已經很努力了", "為讀書、工作與截止日前的疲憊準備一位桌邊夥伴。", "讀書或工作讓我的腦袋很累"],
+  sleep: ["晚安小宇宙", "把今天輕輕放下", "降低刺激，用安靜語音與環境音陪你準備休息。", "我想睡，但腦袋停不下來"],
+  "low-confidence": ["信心修補站", "你不是失敗品", "在自我懷疑時給予真誠肯定，不用空洞的正能量。", "我覺得自己做得不夠好"],
+  heartbreak: ["心碎可可室", "心碎也可以被抱住", "為想念、拒絕與感情失落準備不批判的甜味空間。", "我的心很痛，想要一點溫柔"],
+};
+
+const comfortContentZhHant: Record<string, [string, string]> = {
+  "comfort-akari-lonely-talk": ["明里替你保留第一排", "你已經來到這裡，這本身就很了不起。陪我聽完一首歌吧，今晚沒有人需要獨自發光。"],
+  "comfort-ren-sleep-asmr": ["蓮的午夜節拍器", "跟著四拍吸氣、六拍吐氣，讓今天慢慢闔上最後一頁。"],
+  "comfort-mira-study-comic": ["三格點心休息時間", "第一格，米菈拿走課本；第二格，她貼滿愛心便條；第三格，一個小任務忽然沒那麼可怕。"],
+  "comfort-tohka-confidence-talk": ["十香相信最直接的答案", "只要你還願意嘗試，就不算輸。先吃點溫暖的東西，再讓我大聲替你加油。"],
+  "comfort-kurumi-heartbreak-voice": ["狂三的絲絨重整", "想被愛並不代表你的心很傻。先在這段安靜裡休息一下。"],
+  "comfort-shiori-stress-wallpaper": ["檔案館呼吸壁紙", "配合緩慢呼吸設計的原創漸層壁紙，讓安慰室與玩家房間更平靜。"],
+};
 
 export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapshot = seedSnapshot) {
   for (const user of snapshot.users) {
@@ -73,6 +121,17 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         bangumiUrl: series.bangumiUrl,
       },
     });
+    const zh = seriesZhHant[series.id] ?? { title: series.title, summary: series.summary };
+    await db.seriesLocale.upsert({
+      where: { seriesId_locale: { seriesId: series.id, locale: "EN" } },
+      create: { seriesId: series.id, locale: "EN", title: series.title, summary: series.summary },
+      update: { title: series.title, summary: series.summary },
+    });
+    await db.seriesLocale.upsert({
+      where: { seriesId_locale: { seriesId: series.id, locale: "ZH_HANT" } },
+      create: { seriesId: series.id, locale: "ZH_HANT", ...zh },
+      update: zh,
+    });
   }
 
   for (const definition of snapshot.attributeDefinitions) {
@@ -110,6 +169,14 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         displayOrder: definition.displayOrder,
       },
     });
+    for (const locale of ["EN", "ZH_HANT"] as const) {
+      const label = locale === "ZH_HANT" ? attributeZhHant[definition.key] ?? definition.label : definition.label;
+      await db.attributeDefinitionLocale.upsert({
+        where: { definitionId_locale: { definitionId: definition.id, locale } },
+        create: { definitionId: definition.id, locale, label },
+        update: { label },
+      });
+    }
   }
 
   const tagLabels = [...new Set(snapshot.characters.flatMap((character) => character.tags))];
@@ -135,6 +202,7 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         mood: character.mood,
         rightsType: character.rightsType,
         metadataOnly: character.metadataOnly,
+        publishStatus: "PUBLISHED",
         basePrice: character.basePrice,
         priceStep: character.priceStep,
         unitsPerStep: character.unitsPerStep,
@@ -159,6 +227,7 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         mood: character.mood,
         rightsType: character.rightsType,
         metadataOnly: character.metadataOnly,
+        publishStatus: "PUBLISHED",
         basePrice: character.basePrice,
         priceStep: character.priceStep,
         unitsPerStep: character.unitsPerStep,
@@ -175,6 +244,30 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         tags: { set: character.tags.map((label) => ({ label })) },
       },
     });
+    for (const [locale, publicLocale] of [["EN", "en"], ["ZH_HANT", "zh-Hant"]] as const) {
+      const localized = localizeCharacter(character, publicLocale);
+      await db.characterLocale.upsert({
+        where: { characterId_locale: { characterId: character.id, locale } },
+        create: {
+          characterId: character.id,
+          locale,
+          name: localized.name,
+          title: localized.title,
+          summary: localized.summary,
+          fandomPrompt: localized.fandomPrompt,
+          mood: localized.mood,
+          favoritePhrase: localized.favoritePhrase,
+        },
+        update: {
+          name: localized.name,
+          title: localized.title,
+          summary: localized.summary,
+          fandomPrompt: localized.fandomPrompt,
+          mood: localized.mood,
+          favoritePhrase: localized.favoritePhrase,
+        },
+      });
+    }
 
     for (const attribute of character.attributeValues) {
       await db.characterAttributeValue.upsert({
@@ -328,6 +421,24 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         published: item.published,
       },
     });
+    for (const [locale, publicLocale] of [["EN", "en"], ["ZH_HANT", "zh-Hant"]] as const) {
+      const localized = localizeShopItem(item, publicLocale);
+      await db.shopItemLocale.upsert({
+        where: { shopItemId_locale: { shopItemId: item.id, locale } },
+        create: {
+          shopItemId: item.id,
+          locale,
+          title: localized.title,
+          description: localized.description,
+          previewLabel: localized.previewLabel,
+        },
+        update: {
+          title: localized.title,
+          description: localized.description,
+          previewLabel: localized.previewLabel,
+        },
+      });
+    }
   }
 
   for (const position of snapshot.positions) {
@@ -492,6 +603,17 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         sortOrder: mode.sortOrder,
       },
     });
+    const zh = comfortModeZhHant[mode.slug] ?? [mode.title, mode.subtitle, mode.description, mode.promptLabel];
+    await db.comfortModeLocale.upsert({
+      where: { modeId_locale: { modeId: mode.id, locale: "EN" } },
+      create: { modeId: mode.id, locale: "EN", title: mode.title, subtitle: mode.subtitle, description: mode.description, promptLabel: mode.promptLabel },
+      update: { title: mode.title, subtitle: mode.subtitle, description: mode.description, promptLabel: mode.promptLabel },
+    });
+    await db.comfortModeLocale.upsert({
+      where: { modeId_locale: { modeId: mode.id, locale: "ZH_HANT" } },
+      create: { modeId: mode.id, locale: "ZH_HANT", title: zh[0], subtitle: zh[1], description: zh[2], promptLabel: zh[3] },
+      update: { title: zh[0], subtitle: zh[1], description: zh[2], promptLabel: zh[3] },
+    });
   }
 
   for (const content of snapshot.comfortContents) {
@@ -522,6 +644,17 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
         published: content.published,
         metadata: jsonValue(content.metadata),
       },
+    });
+    const zh = comfortContentZhHant[content.id] ?? [content.title, content.body];
+    await db.comfortContentLocale.upsert({
+      where: { contentId_locale: { contentId: content.id, locale: "EN" } },
+      create: { contentId: content.id, locale: "EN", title: content.title, body: content.body },
+      update: { title: content.title, body: content.body },
+    });
+    await db.comfortContentLocale.upsert({
+      where: { contentId_locale: { contentId: content.id, locale: "ZH_HANT" } },
+      create: { contentId: content.id, locale: "ZH_HANT", title: zh[0], body: zh[1] },
+      update: { title: zh[0], body: zh[1] },
     });
   }
 }

@@ -1,0 +1,13 @@
+import Link from "next/link";
+import { ArrowRight, Clock3, Coins, ShieldCheck } from "lucide-react";
+import { notFound } from "next/navigation";
+import { isPublicLocale, localePath, pick } from "@/components/acg-locale";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { WorkDesk } from "@/components/work-desk";
+
+export default async function WorkPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale: rawLocale } = await params;
+  if (!isPublicLocale(rawLocale)) notFound();
+  const locale = rawLocale;
+  return <div className="exchange-page"><section className="exchange-panel grid overflow-hidden bg-[#111827] text-white lg:grid-cols-[1fr_.7fr]"><div className="p-7 sm:p-10 xl:p-12"><p className="exchange-kicker text-[#ffcc66] before:bg-[#ffcc66]">CHARACTER WORK DISPATCH</p><h1 className="mt-7 exchange-title text-white">{pick(locale, "A quiet shift can fund tomorrow's support.", "安靜完成一份工作，替明天的應援充電。")}</h1><p className="mt-6 max-w-2xl text-base leading-8 text-white/62">{pick(locale, "Send one character to sort signals, help a convention booth, or archive the night feed. One shift at a time, up to 80 SUP each Hong Kong day.", "派遣一名角色整理訊號、支援漫展攤位或歸檔深夜資料。同一時間只進行一份工作，每個香港日最多獲得 80 SUP。")}</p><Link href={localePath(locale, "/me")} className="exchange-button-primary mt-8">{pick(locale, "Return to player room", "返回玩家房間")}<ArrowRight className="h-4 w-4" /></Link></div><div className="grid content-center gap-4 border-t border-white/10 p-7 lg:border-t-0 lg:border-l sm:p-10">{[{ icon: Clock3, en: "30m · 2h · 6h shifts", zh: "30 分鐘 · 2 小時 · 6 小時" }, { icon: Coins, en: "10 · 30 · 60 SUP rewards", zh: "10 · 30 · 60 SUP 獎勵" }, { icon: ShieldCheck, en: "Non-transferable soft currency", zh: "不可轉讓的平台軟幣" }].map(({ icon: Icon, en, zh }) => <div key={en} className="flex items-center gap-4 rounded-[18px_5px_18px_5px] border border-white/10 bg-white/5 p-5"><Icon className="h-5 w-5 text-[#ffcc66]" /><p className="text-sm font-bold text-white/68">{pick(locale, en, zh)}</p></div>)}</div></section><section className="grid gap-7"><SectionHeading eyebrow="AVAILABLE SHIFTS" title={pick(locale, "Choose one dispatch window", "選擇一個派遣時段")} description={pick(locale, "A shift locks when started. Return after its timer to claim the ledger-backed reward.", "工作開始後會鎖定，倒數完成再回來領取帳本記錄的獎勵。")}/><WorkDesk locale={locale} /></section><div className="exchange-panel p-5 text-sm leading-7 text-slate-600"><strong className="text-slate-900">{pick(locale, "Economy note:", "經濟說明：")}</strong> {pick(locale, "Work is a light daily loop, not an idle farm. The daily cap protects the support quote from unlimited token inflation.", "打工是輕量每日循環，不是無限掛機農場；每日上限能避免大量軟幣破壞應援價格。")}</div></div>;
+}

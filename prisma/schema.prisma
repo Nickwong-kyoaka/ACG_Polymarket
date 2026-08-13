@@ -11,6 +11,19 @@ enum UserRole {
   ADMIN
 }
 
+enum LocaleCode {
+  EN
+  ZH_HANT
+}
+
+enum PublishStatus {
+  DRAFT
+  RIGHTS_CHECKED
+  REVIEWED
+  PUBLISHED
+  ARCHIVED
+}
+
 enum RightsType {
   ORIGINAL
   LICENSED
@@ -23,6 +36,9 @@ enum AssetKind {
   WALLPAPER
   AVATAR_FRAME
   PROFILE_THEME
+  VOICE
+  ASMR
+  COMIC
 }
 
 enum AssetWorkflowStatus {
@@ -51,9 +67,43 @@ enum LedgerReferenceType {
   STARTER_GRANT
   DAILY_REWARD
   AD_REWARD
+  MISSION_REWARD
+  WORK_REWARD
   BUY_SUPPORT
   SELL_SUPPORT
   SHOP_PURCHASE
+}
+
+enum CommentStatus {
+  VISIBLE
+  HELD
+  REMOVED
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum MissionKey {
+  COMFORT_SESSION
+  POSITIVE_REACTION
+  SUPPORT_OR_WATCH
+}
+
+enum WorkKind {
+  SHIFT_30M
+  SHIFT_2H
+  SHIFT_6H
+}
+
+enum WorkStatus {
+  ACTIVE
+  READY
+  CLAIMED
+  CANCELLED
 }
 
 enum NotificationType {
@@ -70,13 +120,13 @@ enum SourceKind {
 }
 
 model User {
-  id               String             @id @default(cuid())
-  email            String?            @unique
+  id               String                 @id @default(cuid())
+  email            String?                @unique
   name             String?
   image            String?
-  role             UserRole           @default(USER)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  role             UserRole               @default(USER)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
   authIdentities   AuthIdentity[]
   sessions         Session[]
   profile          Profile?
@@ -93,6 +143,9 @@ model User {
   inventoryItems   InventoryItem[]
   comfortSessions  ComfortSession[]
   comfortReactions ComfortReaction[]
+  idempotency      IdempotencyRecord[]
+  missionProgress  DailyMissionProgress[]
+  workShifts       WorkShift[]
 }
 
 model AuthIdentity {
@@ -132,17 +185,29 @@ model Profile {
 }
 
 model Series {
-  id           String        @id @default(cuid())
-  slug         String        @unique
+  id           String         @id @default(cuid())
+  slug         String         @unique
   title        String
   summary      String
   rightsType   RightsType
-  metadataOnly Boolean       @default(false)
+  metadataOnly Boolean        @default(false)
   bangumiUrl   String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
   characters   Character[]
   rightsGrants RightsGrant[]
+  locales      SeriesLocale[]
+}
+
+model SeriesLocale {
+  id       String     @id @default(cuid())
+  seriesId String
+  locale   LocaleCode
+  title    String
+  summary  String
+  series   Series     @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  @@unique([seriesId, locale])
 }
 
 model Character {
@@ -156,6 +221,7 @@ model Character {
   mood                String
   rightsType          RightsType
   metadataOnly        Boolean                   @default(false)
+  publishStatus       PublishStatus             @default(DRAFT)
   basePrice           Int
   priceStep           Int
   unitsPerStep        Int
@@ -185,6 +251,23 @@ model Character {
   watchlistItems      WatchlistItem[]
   comfortContents     ComfortContent[]
   comfortSessions     ComfortSession[]
+  locales             CharacterLocale[]
+  workShifts          WorkShift[]
+}
+
+model CharacterLocale {
+  id             String     @id @default(cuid())
+  characterId    String
+  locale         LocaleCode
+  name           String
+  title          String
+  summary        String
+  fandomPrompt   String
+  mood           String
+  favoritePhrase String?
+  character      Character  @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([characterId, locale])
 }
 
 model CharacterTag {
@@ -194,18 +277,29 @@ model CharacterTag {
 }
 
 model AttributeDefinition {
-  id           String                    @id @default(cuid())
-  key          String                    @unique
+  id           String                      @id @default(cuid())
+  key          String                      @unique
   label        String
   valueType    String
-  filterable   Boolean                   @default(true)
-  sortable     Boolean                   @default(false)
-  displayable  Boolean                   @default(true)
-  sensitive    Boolean                   @default(false)
-  spoiler      Boolean                   @default(false)
-  displayOrder Int                       @default(0)
+  filterable   Boolean                     @default(true)
+  sortable     Boolean                     @default(false)
+  displayable  Boolean                     @default(true)
+  sensitive    Boolean                     @default(false)
+  spoiler      Boolean                     @default(false)
+  displayOrder Int                         @default(0)
   options      AttributeOption[]
   values       CharacterAttributeValue[]
+  locales      AttributeDefinitionLocale[]
+}
+
+model AttributeDefinitionLocale {
+  id           String              @id @default(cuid())
+  definitionId String
+  locale       LocaleCode
+  label        String
+  definition   AttributeDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([definitionId, locale])
 }
 
 model AttributeOption {
@@ -244,8 +338,16 @@ model CharacterAsset {
   sourceUrl       String?
   attributionText String?
   takedownContact String?
+  sourceLabel     String?
+  licenseName     String?
+  publicUrl       String?
+  mimeType        String?
+  byteSize        Int?
+  aiPrompt        String?
+  aiModel         String?
   character       Character?          @relation(fields: [characterId], references: [id], onDelete: Cascade)
   rightsGrant     RightsGrant?        @relation(fields: [rightsGrantId], references: [id])
+  comfortContents ComfortContent[]
 }
 
 model RightsGrant {
@@ -347,8 +449,13 @@ model AdRewardClaim {
   userId    String
   dayKey    String
   amount    Int
+  slot      Int      @default(1)
+  provider  String   @default("mock")
+  proofId   String?
   claimedAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayKey, slot])
 }
 
 model WatchlistItem {
@@ -363,13 +470,15 @@ model WatchlistItem {
 }
 
 model Comment {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   userId      String
   characterId String
   content     String
-  createdAt   DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  status      CommentStatus @default(VISIBLE)
+  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character     @relation(fields: [characterId], references: [id], onDelete: Cascade)
   reports     Report[]
 }
 
@@ -386,16 +495,18 @@ model Reaction {
 }
 
 model Report {
-  id          String     @id @default(cuid())
+  id          String       @id @default(cuid())
   userId      String
   characterId String?
   commentId   String?
   reason      String
   detail      String?
-  createdAt   DateTime   @default(now())
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  character   Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
-  comment     Comment?   @relation(fields: [commentId], references: [id], onDelete: SetNull)
+  status      ReportStatus @default(OPEN)
+  resolution  String?
+  createdAt   DateTime     @default(now())
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character?   @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  comment     Comment?     @relation(fields: [commentId], references: [id], onDelete: SetNull)
 }
 
 model Notification {
@@ -418,9 +529,9 @@ model ShopCollection {
 }
 
 model ShopItem {
-  id             String          @id @default(cuid())
+  id             String           @id @default(cuid())
   collectionId   String
-  slug           String          @unique
+  slug           String           @unique
   title          String
   description    String
   kind           AssetKind
@@ -428,9 +539,22 @@ model ShopItem {
   price          Int
   previewLabel   String
   unlockPayload  Json
-  published      Boolean         @default(true)
-  collection     ShopCollection  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  published      Boolean          @default(true)
+  collection     ShopCollection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   inventoryItems InventoryItem[]
+  locales        ShopItemLocale[]
+}
+
+model ShopItemLocale {
+  id           String     @id @default(cuid())
+  shopItemId   String
+  locale       LocaleCode
+  title        String
+  description  String
+  previewLabel String
+  shopItem     ShopItem   @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+
+  @@unique([shopItemId, locale])
 }
 
 model InventoryItem {
@@ -446,37 +570,88 @@ model InventoryItem {
 }
 
 model ComfortMode {
-  id          String           @id @default(cuid())
-  slug        String           @unique
+  id          String              @id @default(cuid())
+  slug        String              @unique
   title       String
   subtitle    String
   description String
   promptLabel String
   accentFrom  String
   accentTo    String
-  sortOrder   Int              @default(0)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  sortOrder   Int                 @default(0)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   contents    ComfortContent[]
+  locales     ComfortModeLocale[]
+}
+
+model ComfortModeLocale {
+  id          String      @id @default(cuid())
+  modeId      String
+  locale      LocaleCode
+  title       String
+  subtitle    String
+  description String
+  promptLabel String
+  mode        ComfortMode @relation(fields: [modeId], references: [id], onDelete: Cascade)
+
+  @@unique([modeId, locale])
 }
 
 model ComfortContent {
-  id               String            @id @default(cuid())
+  id               String                 @id @default(cuid())
   modeId           String
   characterId      String?
   kind             String
   title            String
   body             String
   mediaUrl         String?
-  sweetnessLevel   Int               @default(80)
+  assetId          String?
+  sweetnessLevel   Int                    @default(80)
   unlockShopItemId String?
-  published        Boolean           @default(true)
+  published        Boolean                @default(true)
   metadata         Json?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  mode             ComfortMode       @relation(fields: [modeId], references: [id], onDelete: Cascade)
-  character        Character?        @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  mode             ComfortMode            @relation(fields: [modeId], references: [id], onDelete: Cascade)
+  character        Character?             @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  asset            CharacterAsset?        @relation(fields: [assetId], references: [id], onDelete: SetNull)
   reactions        ComfortReaction[]
+  locales          ComfortContentLocale[]
+  comicPanels      ComicPanel[]
+}
+
+model ComfortContentLocale {
+  id        String         @id @default(cuid())
+  contentId String
+  locale    LocaleCode
+  title     String
+  body      String
+  content   ComfortContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, locale])
+}
+
+model ComicPanel {
+  id        String             @id @default(cuid())
+  contentId String
+  sortOrder Int
+  imageUrl  String
+  altText   String
+  content   ComfortContent     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  locales   ComicPanelLocale[]
+
+  @@unique([contentId, sortOrder])
+}
+
+model ComicPanelLocale {
+  id      String     @id @default(cuid())
+  panelId String
+  locale  LocaleCode
+  caption String
+  panel   ComicPanel @relation(fields: [panelId], references: [id], onDelete: Cascade)
+
+  @@unique([panelId, locale])
 }
 
 model ComfortSession {
@@ -499,4 +674,53 @@ model ComfortReaction {
   createdAt DateTime        @default(now())
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   content   ComfortContent? @relation(fields: [contentId], references: [id], onDelete: SetNull)
+}
+
+model IdempotencyRecord {
+  id          String    @id @default(cuid())
+  userId      String
+  scope       String
+  key         String
+  requestHash String
+  response    Json?
+  completedAt DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scope, key])
+  @@index([expiresAt])
+}
+
+model DailyMissionProgress {
+  id          String     @id @default(cuid())
+  userId      String
+  dayKey      String
+  missionKey  MissionKey
+  reward      Int
+  completedAt DateTime?
+  claimedAt   DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayKey, missionKey])
+}
+
+model WorkShift {
+  id          String     @id @default(cuid())
+  userId      String
+  characterId String?
+  dayKey      String
+  kind        WorkKind
+  status      WorkStatus @default(ACTIVE)
+  reward      Int
+  startedAt   DateTime   @default(now())
+  endsAt      DateTime
+  claimedAt   DateTime?
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
+
+  @@index([userId, dayKey])
+  @@index([userId, status])
 }

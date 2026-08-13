@@ -804,6 +804,7 @@ export const seedSnapshot: SeedSnapshot = {
       userId: "viewer-001",
       dayKey: "2026-03-25",
       amount: AD_REWARD,
+      slot: 1,
       claimedAt: now,
     },
   ],

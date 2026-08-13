@@ -1,6 +1,12 @@
 import { bangumiImportSamples } from "@/data/bangumi-samples";
-import { apiOk } from "@/lib/api";
+import { apiOk, handleApiError } from "@/lib/api";
+import { requireAdminSessionUserId } from "@/lib/auth";
 
-export function GET() {
-  return apiOk({ samples: bangumiImportSamples });
+export async function GET() {
+  try {
+    await requireAdminSessionUserId();
+    return apiOk({ samples: bangumiImportSamples });
+  } catch (error) {
+    return handleApiError(error);
+  }
 }

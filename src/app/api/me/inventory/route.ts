@@ -1,6 +1,11 @@
-import { apiOk } from "@/lib/api";
+import { apiOk, handleApiError } from "@/lib/api";
+import { requireSessionUserId } from "@/lib/auth";
 import { getPortfolioView } from "@/lib/store";
 
 export async function GET() {
-  return apiOk({ inventory: (await getPortfolioView()).inventory });
+  try {
+    return apiOk({ inventory: (await getPortfolioView(await requireSessionUserId())).inventory });
+  } catch (error) {
+    return handleApiError(error);
+  }
 }

@@ -13,5 +13,8 @@ export default defineConfig({
   },
   datasource: {
     url: databaseUrl || env("DATABASE_URL"),
+    shadowDatabaseUrl:
+      process.env.SHADOW_DATABASE_URL ??
+      "postgresql://postgres:postgres@localhost:5432/acg_shadow?schema=public",
   },
 });

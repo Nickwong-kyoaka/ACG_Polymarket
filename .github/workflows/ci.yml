@@ -1,5 +1,12 @@
 name: CI
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -9,6 +16,7 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16
@@ -31,9 +39,8 @@ jobs:
       ADMIN_EMAILS: admin@example.com
       BANGUMI_USER_AGENT: ACG_Polymarket CI (+https://github.com/Nickwong-kyoaka/ACG_Polymarket)
       ADS_PROVIDER: mock
-      DEMO_MODE: "true"
-      DEMO_ADMIN_ENABLED: "true"
-      DEMO_USER_ID: viewer-001
+      DEMO_MODE: "false"
+      DEMO_ADMIN_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,7 +50,12 @@ jobs:
       - run: npm ci
       - run: npm run prisma:generate
       - run: npx prisma validate
-      - run: npx prisma db push --skip-generate
+      - name: Apply migrations to clean Postgres
+        run: npx prisma migrate deploy
+      - name: Verify migration state
+        run: npx prisma migrate status
+      - name: Reject Prisma schema drift
+        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test

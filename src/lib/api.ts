@@ -1,6 +1,29 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+export class AppError extends Error {
+  constructor(
+    message: string,
+    public readonly status = 400,
+    public readonly code = "BAD_REQUEST",
+  ) {
+    super(message);
+    this.name = "AppError";
+  }
+}
+
+export class AuthenticationError extends AppError {
+  constructor(message = "Sign in to continue.") {
+    super(message, 401, "UNAUTHENTICATED");
+  }
+}
+
+export class AuthorizationError extends AppError {
+  constructor(message = "You do not have permission to perform this action.") {
+    super(message, 403, "FORBIDDEN");
+  }
+}
+
 export function apiOk<T>(data: T, status = 200) {
   return NextResponse.json(data, { status });
 }
@@ -21,6 +44,13 @@ export async function parseJson<T>(request: Request) {
 export function handleApiError(error: unknown) {
   if (error instanceof ZodError) {
     return apiError(error.issues.map((issue) => issue.message).join("; "), 422);
+  }
+
+  if (error instanceof AppError) {
+    return NextResponse.json(
+      { error: error.message, code: error.code },
+      { status: error.status },
+    );
   }
 
   if (error instanceof Error) {

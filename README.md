@@ -65,7 +65,7 @@ docker compose down -v
 docker compose up --build
 ```
 
-The Docker app service runs `prisma generate`, `prisma db push`, `prisma seed`, then starts `next dev` on `0.0.0.0:3000`.
+The Docker app service runs `prisma generate`, applies committed migrations, seeds the idempotent demo data, then starts `next dev` on `0.0.0.0:3000`. Demo login and demo admin access are enabled only by this local Compose configuration.
 
 ## Local setup without Docker app
 
@@ -93,10 +93,10 @@ docker compose up -d postgres
 npm run prisma:generate
 ```
 
-5. Sync and seed the database:
+5. Apply committed migrations and seed the database:
 
 ```bash
-npm run db:push
+npx prisma migrate deploy
 npm run db:seed
 ```
 
@@ -121,24 +121,37 @@ npm run dev
 
 - Google and email providers are ready once env vars are filled.
 - A demo credentials provider is included so local development works immediately.
+- `.env.example` and Render default `DEMO_MODE` and `DEMO_ADMIN_ENABLED` to `false`. Enable them only in a private local environment.
+- Google login requires `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`. Add `https://YOUR-SERVICE.onrender.com/api/auth/callback/google` as an authorized redirect URI in Google Cloud.
 
 ## Notes on persistence
 
 - The repository includes a full Prisma schema for the target production model.
 - Runtime market, reward, shop, watchlist, comment, reaction, and comfort flows are backed by Prisma/Postgres.
-- Render runs `npm run db:push` and `npm run db:seed` during the beta build so free web services can sync the external Neon/Postgres database.
+- Production builds never push schema changes or seed data.
+- Render applies committed Prisma migrations before starting Next.js. The Blueprint seeds once through `initialDeployHook` after the first successful deploy.
 
 ## Render deployment
 
 This repo includes `render.yaml` for a Render Node web service on `main`, following Render's full Next.js web-service path instead of a static export.
 
 1. Connect the GitHub repo to Render as a Blueprint.
-2. Use a Neon or other durable Postgres URL for `DATABASE_URL`; Render's free Postgres is useful for temporary tests but not durable long-term.
-3. Set `NEXTAUTH_URL` to the Render public URL or custom domain, and keep `AUTH_SECRET` and `NEXTAUTH_SECRET` populated with long random secrets.
-4. Leave `ADS_PROVIDER=mock` until Google ads are approved, then fill `GOOGLE_AD_CLIENT`.
-5. Fill the `S3_*` values only when asset upload storage is connected.
+2. Use a Neon or other durable Postgres URL for `DATABASE_URL`; Render free Postgres expires after 30 days and is best kept for temporary tests.
+3. Set `NEXTAUTH_URL` to the full Render URL or custom domain, such as `https://acg-polymarket.onrender.com`.
+4. Populate `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `ADMIN_EMAILS`. Render generates `AUTH_SECRET` and `NEXTAUTH_SECRET` from the Blueprint.
+5. Keep `DEMO_MODE=false`, `DEMO_ADMIN_ENABLED=false`, and `ADS_PROVIDER=mock` for the first public deployment.
+6. Fill the `S3_*` values only when durable asset storage is connected. Render's local filesystem is ephemeral.
 
-The Render service builds with `npm ci && npm run prisma:generate && npm run db:push && npm run db:seed && npm run build`, starts with `npm run start -- -H 0.0.0.0 -p $PORT`, and auto-deploys from `main` after GitHub checks pass.
+Render uses these lifecycle commands:
+
+```text
+Build: npm ci && npm run prisma:generate && npm run build
+Start: npx prisma migrate deploy && npm run start -- -H 0.0.0.0 -p $PORT
+First deploy only: npm run db:seed
+Health check: /api/health
+```
+
+The health endpoint performs a lightweight `SELECT 1`, returns `200` only when PostgreSQL is reachable, and returns `503` without exposing database errors otherwise. Existing services that were already initialized do not rerun `initialDeployHook`; seed manually only when that database has not already been populated.
 
 ## Content policy
 
@@ -150,6 +163,9 @@ The Render service builds with `npm ci && npm run prisma:generate && npm run db:
 
 The current repo passes:
 
+- `npx prisma validate`
+- `npx prisma migrate deploy`
+- `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code`
 - `npm run lint`
 - `npm run typecheck`
 - `npm run test`

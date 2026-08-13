@@ -10,7 +10,7 @@ export function Surface({
   return (
     <div
       className={cn(
-        "manga-panel rounded-[2rem] bg-white/90 shadow-[0_22px_80px_-44px_rgba(23,17,38,0.52)] backdrop-blur-xl",
+        "exchange-panel",
         className,
       )}
     >

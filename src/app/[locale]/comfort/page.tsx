@@ -1,0 +1,32 @@
+import Link from "next/link";
+import { ArrowRight, AudioLines, BookHeart, HeartHandshake, MoonStar } from "lucide-react";
+import { notFound } from "next/navigation";
+import { CharacterArt } from "@/components/character-art";
+import { isPublicLocale, localePath, localizeCharacter } from "@/components/acg-locale";
+import { ComfortModeCard, ComfortNotice, localizeComfortContent, localizeComfortMode, MiniComic } from "@/components/comfort-hub";
+import { ComfortPlayer } from "@/components/comfort-player";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { getComfortModeView, listComfortModes } from "@/lib/store";
+
+export const dynamic = "force-dynamic";
+
+export default async function ComfortHubPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale: rawLocale } = await params;
+  if (!isPublicLocale(rawLocale)) notFound();
+  const locale = rawLocale;
+  const modes = await listComfortModes(locale);
+  const featuredView = modes[0] ? await getComfortModeView(modes[0].slug, locale).catch(() => null) : null;
+  const featuredMode = featuredView ? localizeComfortMode(featuredView, locale) : null;
+  const featuredSource = featuredView?.contents.find((content) => content.character);
+  const featuredCharacter = featuredSource?.character ? localizeCharacter(featuredSource.character, locale) : null;
+  const featuredContent = featuredSource ? localizeComfortContent(featuredSource, locale) : null;
+  const copy = locale === "zh-Hant" ? { eyebrow: "ACG COMFORT FREQUENCY", title: "今晚不必一個人把情緒撐完。", body: "依照孤單、壓力、讀書疲勞、失眠、自信低落或心碎，選一間角色安慰室。你可以聽一段合成語音、看四格小故事，再把喜歡留下來。", choose: "選擇今晚的房間", market: "回到角色訊號", modesEyebrow: "SIX COMFORT MODES", modesTitle: "先說你需要哪一種陪伴", modesBody: "每個房間都使用不同語氣、節奏與角色內容；它們不要求你馬上變好。", sampleEyebrow: "TONIGHT'S FEATURED ROOM", sampleTitle: "一段可以停留的角色時間", sampleBody: "內容從資料庫讀取，語音由瀏覽器合成，環境音只在你的裝置播放。", comicEyebrow: "ORIGINAL MINI COMIC", comicTitle: "四格之後，世界可以小聲一點", comicBody: "原創抽象分鏡不重製官方漫畫，讓每個安慰需求都有自己的甜度。" } : { eyebrow: "ACG COMFORT FREQUENCY", title: "You do not have to carry the whole feeling alone tonight.", body: "Choose a character room for loneliness, stress, study fatigue, sleep, low confidence, or heartbreak. Hear a synthesized voice line, read a four-panel story, and leave a little affection behind.", choose: "Choose tonight's room", market: "Return to signals", modesEyebrow: "SIX COMFORT MODES", modesTitle: "Start with the kind of company you need", modesBody: "Each room uses a different voice, pace, and character route. None of them asks you to feel better immediately.", sampleEyebrow: "TONIGHT'S FEATURED ROOM", sampleTitle: "A character moment worth staying inside", sampleBody: "Content comes from the database, voice is synthesized by the browser, and ambience plays only on your device.", comicEyebrow: "ORIGINAL MINI COMIC", comicTitle: "After four panels, the world can be quieter", comicBody: "Original abstract storyboards avoid reproducing official manga while giving every comfort need its own sweetness." };
+
+  return <div className="exchange-page">
+    <section className="exchange-panel overflow-hidden bg-[#111827] text-white"><div className="grid lg:grid-cols-[.95fr_1.05fr]"><div className="flex flex-col justify-center p-7 sm:p-10 xl:p-12"><p className="exchange-kicker text-[#ffcc66] before:bg-[#ffcc66]">{copy.eyebrow}</p><h1 className="mt-7 exchange-title text-white">{copy.title}</h1><p className="mt-6 max-w-2xl text-base leading-8 text-white/62">{copy.body}</p><div className="mt-8 flex flex-wrap gap-3"><Link href="#comfort-modes" className="exchange-button-primary"><HeartHandshake className="h-4 w-4" />{copy.choose}</Link><Link href={localePath(locale, "/market")} className="inline-flex items-center gap-2 rounded-[14px_4px_14px_4px] border border-white/15 px-5 py-3 text-sm font-black text-white hover:bg-white/8">{copy.market}<ArrowRight className="h-4 w-4" /></Link></div></div><div className="group relative min-h-[520px]">{featuredCharacter ? <CharacterArt character={featuredCharacter} className="absolute inset-0 h-full" priority /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_60%_30%,rgba(62,214,224,.35),transparent_25%),linear-gradient(135deg,#15233d,#553a61)]" />}{featuredMode ? <div className="absolute inset-x-6 bottom-6 z-10 rounded-[22px_5px_22px_5px] border border-white/15 bg-[#111827]/84 p-5 backdrop-blur-xl"><p className="text-[10px] font-black uppercase tracking-[.2em] text-[#3ed6e0]">{featuredMode.subtitle}</p><h2 className="mt-2 font-display text-4xl">{featuredMode.title}</h2><p className="mt-3 text-sm leading-7 text-white/62">{featuredMode.description}</p></div> : null}</div></div></section>
+    <ComfortNotice locale={locale} />
+    <section id="comfort-modes" className="grid gap-7"><SectionHeading eyebrow={copy.modesEyebrow} title={copy.modesTitle} description={copy.modesBody} /><div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{modes.map((mode) => <ComfortModeCard key={mode.id} mode={mode} locale={locale} />)}</div></section>
+    {featuredView && featuredMode && featuredContent ? <section className="grid gap-7"><SectionHeading eyebrow={copy.sampleEyebrow} title={copy.sampleTitle} description={copy.sampleBody} /><div className="grid gap-6 lg:grid-cols-[.9fr_1.1fr]"><div className="exchange-panel p-6 sm:p-8"><div className="flex items-center gap-3"><MoonStar className="h-6 w-6 text-[#e83c62]" /><p className="text-[10px] font-black uppercase tracking-[.2em] text-[#e83c62]">{featuredContent.kind}</p></div><h3 className="mt-5 font-display text-4xl">{featuredContent.title}</h3><p className="mt-5 text-base leading-8 text-slate-600">{featuredContent.body}</p><div className="mt-7 flex gap-3"><span className="inline-flex items-center gap-2 rounded-full bg-[#fff1f3] px-4 py-2 text-xs font-black text-[#d9375b]"><BookHeart className="h-4 w-4" />{featuredContent.sweetnessLevel}% sweetness</span><span className="inline-flex items-center gap-2 rounded-full bg-[#e9f8f7] px-4 py-2 text-xs font-black text-[#19757a]"><AudioLines className="h-4 w-4" />Web Audio</span></div></div><ComfortPlayer locale={locale} modeSlug={featuredView.slug} line={featuredContent.body} characterId={featuredContent.characterId} contentId={featuredContent.id} /></div></section> : null}
+    {featuredView ? <section className="grid gap-7"><SectionHeading eyebrow={copy.comicEyebrow} title={copy.comicTitle} description={copy.comicBody} /><MiniComic mode={featuredView} locale={locale} /></section> : null}
+  </div>;
+}

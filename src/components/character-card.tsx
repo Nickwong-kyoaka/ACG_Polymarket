@@ -1,11 +1,11 @@
 import Link from "next/link";
-import Image from "next/image";
+import { MessageCircle, Radio, Users } from "lucide-react";
+import { CharacterArt } from "@/components/character-art";
+import { getExchangeCopy, localePath, localizeCharacter, type PublicLocale } from "@/components/acg-locale";
+import { MarketSparkline } from "@/components/market-sparkline";
 import { Badge } from "@/components/ui/badge";
-import { Surface } from "@/components/ui/surface";
-import { getSafeCharacterImage } from "@/lib/character-visuals";
-import { getCopy, hrefWithLocale, type Locale } from "@/lib/i18n";
 import { getBuyQuote } from "@/lib/market";
-import { cn, compactNumber, currencyLabel } from "@/lib/utils";
+import { compactNumber, currencyLabel } from "@/lib/utils";
 import { WatchlistButton } from "@/components/watchlist-button";
 import type { Character } from "@/lib/types";
 
@@ -18,107 +18,76 @@ export function CharacterCard({
   character: Character;
   watching?: boolean;
   commentCount?: number;
-  locale?: Locale;
+  locale?: PublicLocale;
 }) {
+  const localized = localizeCharacter(character, locale);
   const quote = getBuyQuote(character);
-  const copy = getCopy(locale);
-  const visualUrl = getSafeCharacterImage(character);
+  const copy = getExchangeCopy(locale);
 
   return (
-    <Surface className="group overflow-hidden transition duration-300 hover:-translate-y-1">
-      <div
-        className={cn(
-          "shine-sweep relative min-h-[310px] w-full overflow-hidden",
-          visualUrl ? "" : "anime-portrait-stage",
-        )}
-        style={{
-          background: `linear-gradient(135deg, ${character.accentFrom}, ${character.accentTo})`,
-        }}
-      >
-        <div className="halftone absolute inset-0 opacity-30" />
-        {visualUrl ? (
-          <Image
-            src={visualUrl}
-            alt={`${character.name} original AI-generated key visual`}
-            fill
-            sizes="(min-width: 1024px) 50vw, 100vw"
-            className="object-cover object-top"
-            priority={character.isFeatured}
-          />
-        ) : null}
-        <div className="absolute left-5 top-5 flex flex-wrap gap-2">
+    <article className="character-card exchange-panel group overflow-hidden">
+      <div className="relative">
+        <CharacterArt character={localized} priority={character.isFeatured} />
+        <div className="absolute left-4 top-4 z-10 flex flex-wrap gap-2 sm:left-5 sm:top-5">
           <Badge tone={character.rightsType === "ORIGINAL" ? "warm" : "cool"}>
-            {character.rightsType === "ORIGINAL" ? copy.common.originalIp : copy.common.licensedMetadata}
+            {character.rightsType === "ORIGINAL" ? copy.common.original : copy.common.metadata}
           </Badge>
-          {character.metadataOnly ? <Badge>{copy.common.attributionFirst}</Badge> : null}
+          {character.releaseSeason ? <Badge>{character.releaseSeason}</Badge> : null}
         </div>
-        <div className="absolute bottom-5 left-5 right-5 rounded-[1.5rem] bg-white/88 p-4 backdrop-blur">
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#ff3d7f]">
-            {character.sourceTitle ?? character.title}
+        <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-6">
+          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.25em] text-white/65">
+            {localized.sourceTitle ?? localized.title}
           </p>
-          <h3 className="mt-1 font-display text-3xl leading-none text-[#171126]">
-            {character.name}
+          <h3 className="font-display text-4xl leading-none sm:text-[2.8rem]">
+            {localized.name}
           </h3>
         </div>
       </div>
-      <div className="flex flex-col gap-5 p-6">
+      <div className="flex flex-col gap-5 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
-                {character.title}
-              </p>
-              {character.favoritePhrase ? (
-                <p className="mt-3 rounded-[1.25rem] bg-[#fff2c5] px-4 py-3 text-sm leading-7 text-[#171126]">
-                  &ldquo;{character.favoritePhrase}&rdquo;
-                </p>
-              ) : null}
-            </div>
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#e83c62]">{localized.title}</p>
+            {localized.favoritePhrase ? <p className="mt-3 text-sm leading-7 text-slate-600">&ldquo;{localized.favoritePhrase}&rdquo;</p> : null}
           </div>
-          <WatchlistButton characterId={character.id} watching={watching} />
+          <WatchlistButton characterId={character.id} watching={watching} locale={locale} />
         </div>
 
-        <p className="line-clamp-3 text-sm leading-7 text-slate-600">{character.summary}</p>
+        <p className="line-clamp-3 text-sm leading-7 text-slate-600">{localized.summary}</p>
 
         <div className="flex flex-wrap gap-2">
           {character.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-white/75 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-slate-600 ring-1 ring-black/10"
-            >
-              {tag}
-            </span>
+            <span key={tag} className="rounded-full bg-[#eef1f3] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">#{tag}</span>
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-3 rounded-[1.5rem] bg-[#171126] px-4 py-3 text-white">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-white/60">
-              {copy.common.quote}
-            </p>
-            <p className="text-lg font-semibold">{currencyLabel(quote)}</p>
+        <div className="grid grid-cols-[1fr_112px] items-end gap-4 rounded-[20px_5px_20px_5px] bg-[#111827] p-4 text-white">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="market-stat">
+              <Radio className="mb-2 h-4 w-4 text-[#ffcc66]" />
+              <p className="text-[9px] uppercase tracking-[0.15em] text-white/45">{copy.common.quote}</p>
+              <p className="mt-1 text-base font-black">{currencyLabel(quote)}</p>
+            </div>
+            <div className="market-stat">
+              <Users className="mb-2 h-4 w-4 text-[#3ed6e0]" />
+              <p className="text-[9px] uppercase tracking-[0.15em] text-white/45">{copy.common.supporters}</p>
+              <p className="mt-1 text-base font-black">{compactNumber(character.supporterCount)}</p>
+            </div>
+            <div className="market-stat">
+              <MessageCircle className="mb-2 h-4 w-4 text-[#ff7d9a]" />
+              <p className="text-[9px] uppercase tracking-[0.15em] text-white/45">{copy.common.comments}</p>
+              <p className="mt-1 text-base font-black">{compactNumber(commentCount)}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-white/60">
-              {copy.common.supporters}
-            </p>
-            <p className="text-lg font-semibold">{compactNumber(character.supporterCount)}</p>
-          </div>
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-white/60">
-              {copy.common.comments}
-            </p>
-            <p className="text-lg font-semibold">{compactNumber(commentCount)}</p>
-          </div>
+          <MarketSparkline seed={character.circulatingUnits + character.supporterCount} />
         </div>
 
         <Link
-          href={hrefWithLocale(`/character/${character.slug}`, locale)}
-          className="inline-flex items-center justify-center rounded-full bg-[#ff3d7f] px-5 py-3 text-sm font-black text-white transition hover:bg-[#e32369]"
+          href={localePath(locale, `/character/${character.slug}`)}
+          className="exchange-button-primary"
         >
-          {copy.common.openCharacter}
+          {copy.common.open}
         </Link>
       </div>
-    </Surface>
+    </article>
   );
 }

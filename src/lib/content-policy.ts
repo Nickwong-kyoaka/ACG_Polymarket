@@ -18,6 +18,9 @@ export function validateAssetSource(input: {
   sourceUrl?: string;
   attributionText?: string;
   takedownContact?: string;
+  sourceLabel?: string;
+  aiPrompt?: string;
+  aiModel?: string;
 }) {
   if (input.workflowStatus === "PUBLISHED" && !input.rightsGrantId) {
     throw new Error("Published assets require a linked rights grant.");
@@ -29,6 +32,14 @@ export function validateAssetSource(input: {
 
   if (input.sourceKind === "OFFICIAL_REFERENCE" && !input.takedownContact) {
     throw new Error("Official-reference assets require a takedown contact before publish.");
+  }
+
+  if (input.workflowStatus === "PUBLISHED" && input.sourceKind === "AI_GENERATED" && (!input.aiPrompt || !input.aiModel)) {
+    throw new Error("Published AI-generated assets require prompt and model provenance.");
+  }
+
+  if (input.workflowStatus === "PUBLISHED" && input.sourceKind === "USER_PROVIDED" && (!input.attributionText || !input.takedownContact)) {
+    throw new Error("Published user-provided assets require attribution and a takedown contact.");
   }
 }
 

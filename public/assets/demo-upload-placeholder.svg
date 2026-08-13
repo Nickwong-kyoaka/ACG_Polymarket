@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title description">
+  <title id="title">Local demo media placeholder</title>
+  <description id="description">A pink and blue ACG Exchange upload placeholder used during local development.</description>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#171126"/>
+      <stop offset="0.52" stop-color="#392856"/>
+      <stop offset="1" stop-color="#12627a"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop stop-color="#ff6da6" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#ff6da6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="675" rx="42" fill="url(#bg)"/>
+  <circle cx="955" cy="130" r="310" fill="url(#glow)"/>
+  <path d="M0 520C240 430 350 650 620 520s390-80 580-210v365H0z" fill="#fff" opacity=".08"/>
+  <g fill="none" stroke="#fff" stroke-width="7" opacity=".9">
+    <rect x="111" y="152" width="254" height="254" rx="52"/>
+    <path d="M170 344l63-70 48 43 42-52"/>
+    <circle cx="286" cy="224" r="25"/>
+  </g>
+  <text x="430" y="274" fill="#ffe56b" font-family="sans-serif" font-size="34" font-weight="800" letter-spacing="6">ACG EXCHANGE</text>
+  <text x="430" y="342" fill="white" font-family="sans-serif" font-size="58" font-weight="900">LOCAL ASSET INTAKE</text>
+  <text x="433" y="397" fill="#d8d0e5" font-family="sans-serif" font-size="24">Configure S3_* variables to upload durable public media.</text>
+</svg>
