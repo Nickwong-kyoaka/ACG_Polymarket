@@ -1,8 +1,10 @@
+import Image from "next/image";
 import { CommentPanel } from "@/components/comment-panel";
 import { SupportTradePanel } from "@/components/support-trade-panel";
 import { Badge } from "@/components/ui/badge";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Surface } from "@/components/ui/surface";
+import { getSafeCharacterImage } from "@/lib/character-visuals";
 import { getCopy } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-locale";
 import { getCharacterView, getPortfolioView, getReactionSummary } from "@/lib/store";
@@ -23,6 +25,7 @@ export default async function CharacterPage({
     (position) => position.character.id === view.character.id,
   );
   const reactions = await getReactionSummary(view.character.id);
+  const visualUrl = getSafeCharacterImage(view.character);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-12">
@@ -62,14 +65,28 @@ export default async function CharacterPage({
             ) : null}
           </div>
 
-          <SupportTradePanel
-            characterId={view.character.id}
-            quote={view.quote}
-            sellQuote={view.sellQuote}
-            balance={portfolio.wallet.softBalance}
-            ownedUnits={ownedPosition?.units ?? 0}
-            locale={locale}
-          />
+          <div className="grid gap-5">
+            {visualUrl ? (
+              <div className="relative min-h-[360px] overflow-hidden rounded-[2rem] border border-white/20 bg-white/15 shadow-[0_24px_70px_-42px_rgba(23,17,38,0.75)]">
+                <Image
+                  src={visualUrl}
+                  alt={`${view.character.name} original AI-generated key visual`}
+                  fill
+                  sizes="(min-width: 1024px) 42vw, 100vw"
+                  className="object-cover object-top"
+                  priority
+                />
+              </div>
+            ) : null}
+            <SupportTradePanel
+              characterId={view.character.id}
+              quote={view.quote}
+              sellQuote={view.sellQuote}
+              balance={portfolio.wallet.softBalance}
+              ownedUnits={ownedPosition?.units ?? 0}
+              locale={locale}
+            />
+          </div>
         </div>
       </section>
 

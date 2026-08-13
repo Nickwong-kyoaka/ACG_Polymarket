@@ -1,9 +1,11 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Surface } from "@/components/ui/surface";
+import { getSafeCharacterImage } from "@/lib/character-visuals";
 import { getCopy, hrefWithLocale, type Locale } from "@/lib/i18n";
 import { getBuyQuote } from "@/lib/market";
-import { compactNumber, currencyLabel } from "@/lib/utils";
+import { cn, compactNumber, currencyLabel } from "@/lib/utils";
 import { WatchlistButton } from "@/components/watchlist-button";
 import type { Character } from "@/lib/types";
 
@@ -20,16 +22,30 @@ export function CharacterCard({
 }) {
   const quote = getBuyQuote(character);
   const copy = getCopy(locale);
+  const visualUrl = getSafeCharacterImage(character);
 
   return (
     <Surface className="group overflow-hidden transition duration-300 hover:-translate-y-1">
       <div
-        className="anime-portrait-stage shine-sweep min-h-[230px] w-full"
+        className={cn(
+          "shine-sweep relative min-h-[310px] w-full overflow-hidden",
+          visualUrl ? "" : "anime-portrait-stage",
+        )}
         style={{
           background: `linear-gradient(135deg, ${character.accentFrom}, ${character.accentTo})`,
         }}
       >
         <div className="halftone absolute inset-0 opacity-30" />
+        {visualUrl ? (
+          <Image
+            src={visualUrl}
+            alt={`${character.name} original AI-generated key visual`}
+            fill
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            className="object-cover object-top"
+            priority={character.isFeatured}
+          />
+        ) : null}
         <div className="absolute left-5 top-5 flex flex-wrap gap-2">
           <Badge tone={character.rightsType === "ORIGINAL" ? "warm" : "cool"}>
             {character.rightsType === "ORIGINAL" ? copy.common.originalIp : copy.common.licensedMetadata}
