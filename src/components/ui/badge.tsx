@@ -8,16 +8,16 @@ export function Badge({
   tone?: "neutral" | "warm" | "cool" | "success";
 }) {
   const tones = {
-    neutral: "bg-white/75 text-slate-700 ring-black/10",
-    warm: "bg-[#fff2c5] text-[#9c4300] ring-[#ffbd5a]",
-    cool: "bg-[#e9f7ff] text-[#1659a9] ring-[#7bd6ff]",
-    success: "bg-[#e7f8ec] text-[#23744b] ring-[#8ad2a8]",
+    neutral: "bg-[#fffaf0] text-slate-700 ring-black/25",
+    warm: "bg-[#f2ca61] text-[#5f2b13] ring-black/25",
+    cool: "bg-[#d6ece9] text-[#155d62] ring-black/25",
+    success: "bg-[#dce9d8] text-[#285e42] ring-black/25",
   } as const;
 
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.16em] ring-1 sticker-shadow",
+        "inline-flex items-center px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.13em] ring-1",
         tones[tone],
       )}
     >

@@ -7,3 +7,4 @@ Dockerfile.local
 .env
 .env*.local
 tsconfig.tsbuildinfo
+review-media

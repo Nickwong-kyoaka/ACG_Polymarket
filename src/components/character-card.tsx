@@ -62,11 +62,11 @@ export function CharacterCard({
 
         <div className="flex flex-wrap gap-2">
           {character.tags.map((tag) => (
-            <span key={tag} className="rounded-full bg-[#eef1f3] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">#{tag}</span>
+            <span key={tag} className="border border-black/15 bg-[#eee7da] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.11em] text-slate-600">#{tag}</span>
           ))}
         </div>
 
-        <div className="grid grid-cols-[1fr_112px] items-end gap-4 rounded-[20px_5px_20px_5px] bg-[#111827] p-4 text-white">
+        <div className="grid grid-cols-[1fr_112px] items-end gap-4 border border-black bg-[#182033] p-4 text-white">
           <div className="grid grid-cols-3 gap-3">
             <div className="market-stat">
               <Radio className="mb-2 h-4 w-4 text-[#ffcc66]" />
@@ -87,7 +87,7 @@ export function CharacterCard({
           <MarketHistoryChart characterId={character.id} locale={locale} compact />
         </div>
 
-        {activity24h || campaign ? <div className="grid gap-3 rounded-[18px_5px_18px_5px] bg-[#f5f1e8] p-4">{activity24h ? <div className="flex items-center justify-between gap-4 text-xs"><span className="font-black uppercase tracking-[.13em] text-slate-400">24H {locale === "zh-Hant" ? "正向應援" : "POSITIVE SUPPORT"}</span><span className="font-black text-[#e83c62]">+{activity24h.buyUnits} · {activity24h.uniqueSupporters} {locale === "zh-Hant" ? "人" : "fans"}</span></div> : null}{campaign ? <div><div className="flex items-center justify-between gap-3 text-[10px] font-black"><span className="truncate text-slate-600">{campaign.title}</span><span className="text-slate-400">{campaign.progressPercent}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-gradient-to-r from-[#ff4e72] to-[#ffcc66]" style={{ width: `${campaign.progressPercent}%` }} /></div></div> : null}</div> : null}
+        {activity24h || campaign ? <div className="grid gap-3 border-y border-black/15 bg-[#eee7da] p-4">{activity24h ? <div className="flex items-center justify-between gap-4 text-xs"><span className="font-black uppercase tracking-[.11em] text-slate-500">24H {locale === "zh-Hant" ? "正向應援" : "POSITIVE SUPPORT"}</span><span className="font-black text-[#bd3628]">+{activity24h.buyUnits} · {activity24h.uniqueSupporters} {locale === "zh-Hant" ? "人" : "fans"}</span></div> : null}{campaign ? <div><div className="flex items-center justify-between gap-3 text-[10px] font-black"><span className="truncate text-slate-700">{campaign.title}</span><span className="text-slate-500">{campaign.progressPercent}%</span></div><div className="mt-2 h-2 border border-black/15 bg-white"><div className="h-full bg-[#e64632]" style={{ width: `${campaign.progressPercent}%` }} /></div></div> : null}</div> : null}
 
         <Link
           href={localePath(locale, `/character/${character.slug}`)}

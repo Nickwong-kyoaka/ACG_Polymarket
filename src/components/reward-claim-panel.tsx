@@ -34,11 +34,11 @@ export function RewardClaimPanel({ locale = "en" }: { locale?: PublicLocale }) {
 
   const busy = submitting || pending;
   return (
-    <div className="grid gap-4 rounded-[22px_5px_22px_5px] bg-[#111827] p-5 text-white">
+    <div className="grid gap-4 border border-black bg-[#182033] p-5 text-white">
       <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ffcc66]">SUP ENERGY LOOP</p><h3 className="mt-2 font-display text-2xl">{copy.rewards.title}</h3></div>
       <div className="grid grid-cols-2 gap-3">
         <button type="button" disabled={busy} onClick={() => claim("/api/rewards/check-in")} className="exchange-button-primary px-3 disabled:opacity-60"><CalendarHeart className="h-4 w-4" />{copy.rewards.daily}</button>
-        <button type="button" disabled={busy} onClick={() => claim("/api/rewards/ad-claim")} className="inline-flex items-center justify-center gap-2 rounded-[14px_4px_14px_4px] border border-white/15 px-3 py-3 text-xs font-black text-white transition hover:bg-white/10 disabled:opacity-60"><PlayCircle className="h-4 w-4" />{copy.rewards.ad}</button>
+        <button type="button" disabled={busy} onClick={() => claim("/api/rewards/ad-claim")} className="inline-flex items-center justify-center gap-2 border border-white/30 px-3 py-3 text-xs font-black text-white transition hover:bg-white/10 disabled:opacity-60"><PlayCircle className="h-4 w-4" />{copy.rewards.ad}</button>
       </div>
       {status ? <p className="text-sm font-medium text-white/70">{status}</p> : null}
     </div>

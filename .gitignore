@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local-only third-party media review inbox. Never commit unapproved image bytes.
+/review-media/

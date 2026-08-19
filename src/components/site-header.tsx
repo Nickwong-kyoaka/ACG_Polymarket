@@ -62,8 +62,8 @@ export function SiteHeader({ signedIn = false, viewerName }: { signedIn?: boolea
           </nav>
 
           <div className="flex items-center gap-2">
-            <Link href={localePath(locale, "/work")} className="hidden rounded-full border border-white/12 bg-white/7 px-4 py-2 text-xs font-bold text-white/80 transition hover:bg-white/12 sm:inline-flex">
-              <BriefcaseBusiness className="mr-2 h-4 w-4 text-[#ffcc66]" />
+            <Link href={localePath(locale, "/work")} className="exchange-button-secondary hidden px-3 py-2 text-xs sm:inline-flex">
+              <BriefcaseBusiness className="mr-1 h-4 w-4 text-[#bd3628]" />
               {copy.nav.work}
             </Link>
             <div className="locale-switch" aria-label="Language switch">
