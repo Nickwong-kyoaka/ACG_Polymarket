@@ -161,6 +161,7 @@ export async function getPositiveMarketFeed(options: MarketFeedOptions = {}) {
             creatorName: asset.creatorName ?? null,
             creatorUrl: asset.creatorUrl ?? null,
             licenseUrl: asset.licenseUrl ?? null,
+            sourceKind: asset.sourceKind,
             permissionStatus: asset.permissionStatus,
           }
         : null,

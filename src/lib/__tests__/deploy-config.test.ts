@@ -21,7 +21,7 @@ describe("Render deployment support", () => {
     expect(yamlCommand("buildCommand")).toBe("npm ci && npm run prisma:generate && npm run build");
     expect(yamlCommand("buildCommand")).not.toMatch(/db:push|db:seed|migrate/);
     expect(yamlCommand("startCommand")).toBe(
-      "npx prisma migrate deploy && npm run start -- -H 0.0.0.0 -p $PORT",
+      "npx prisma migrate deploy && npm run media:sync-approved && npm run start -- -H 0.0.0.0 -p $PORT",
     );
     expect(yamlCommand("initialDeployHook")).toBe("npm run db:seed");
     expect(yamlCommand("healthCheckPath")).toBe("/api/health");
@@ -59,7 +59,7 @@ describe("Render deployment support", () => {
   });
 
   it("runs migrations at runtime and migration smoke tests in CI", () => {
-    expect(dockerfile).toContain("npx prisma migrate deploy && npm run start");
+    expect(dockerfile).toContain("npx prisma migrate deploy && npm run media:sync-approved && npm run start");
     expect(dockerfile).toContain("/api/health");
     expect(workflow).toContain("npx prisma migrate deploy");
     expect(workflow).toContain("npx prisma migrate status");

@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import type { SeedSnapshot } from "./types";
 import { localizeCharacter, localizeShopItem } from "@/components/acg-locale";
 import { catalogCharactersV2, catalogSeriesV2 } from "@/data/catalog-v2";
+import { syncApprovedMedia } from "@/lib/approved-media";
 
 type SeedClient = typeof prisma;
 
@@ -446,6 +447,8 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
       }
     }
   }
+
+  await syncApprovedMedia(db);
 
   for (const collection of snapshot.shopCollections) {
     await db.shopCollection.upsert({

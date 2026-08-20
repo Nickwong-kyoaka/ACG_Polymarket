@@ -152,7 +152,7 @@ if (demoMode) {
 
 export const authOptions: NextAuthConfig = {
   secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
-  trustHost: process.env.AUTH_TRUST_HOST === "true" || process.env.RENDER === "true",
+  trustHost: process.env.AUTH_TRUST_HOST === "true" || process.env.RENDER === "true" || process.env.NODE_ENV === "development",
   session: {
     strategy: "jwt",
   },

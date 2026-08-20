@@ -28,7 +28,7 @@ export function toPublicAsset(asset: CharacterAsset): PublicCharacterAsset | und
     licenseName: asset.licenseName,
     publicUrl: renderedUrl,
     storageKey: asset.storageKey,
-    permissionBadge: asset.licenseName ?? (asset.sourceKind === "AI_GENERATED" ? "AI GENERATED" : asset.sourceKind?.replaceAll("_", " ")),
+    permissionBadge: asset.permissionStatus ?? (asset.sourceKind === "AI_GENERATED" ? "AI GENERATED" : asset.sourceKind?.replaceAll("_", " ")),
   };
 }
 

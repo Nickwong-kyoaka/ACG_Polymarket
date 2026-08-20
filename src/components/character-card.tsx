@@ -23,7 +23,7 @@ export function CharacterCard({
   commentCount?: number;
   activity24h?: { buyUnits: number; uniqueSupporters: number; volume: number };
   campaign?: { title: string; currentUnits: number; goalUnits: number; progressPercent: number } | null;
-  asset?: { publicUrl: string; altText: string };
+  asset?: { publicUrl: string; altText: string; sourceLabel?: string | null; sourceKind?: string | null; permissionStatus?: string | null };
   locale?: PublicLocale;
 }) {
   const localized = localizeCharacter(character, locale);
@@ -39,6 +39,9 @@ export function CharacterCard({
             {character.rightsType === "ORIGINAL" ? copy.common.original : copy.common.metadata}
           </Badge>
           {character.releaseSeason ? <Badge>{localizeReleaseSeason(character.releaseSeason, locale)}</Badge> : null}
+          {asset?.permissionStatus === "UNVERIFIED" && ["OFFICIAL_REFERENCE", "FAN_ART", "OPEN_LICENSE"].includes(asset.sourceKind ?? "") ? (
+            <Badge>{locale === "zh-Hant" ? "來源連結 · 授權未驗證" : "SOURCE-LINKED · UNVERIFIED"}</Badge>
+          ) : null}
         </div>
         <div className="absolute inset-x-0 bottom-0 z-10 p-5 text-white sm:p-6">
           <p className="mb-2 text-[10px] font-black uppercase tracking-[0.25em] text-white/65">

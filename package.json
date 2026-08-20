@@ -19,7 +19,9 @@
     "db:beta-reset": "tsx prisma/beta-reset.ts --confirm=RESET_ACG_BETA",
     "media:validate": "tsx scripts/media/import-media.ts --dry-run",
     "media:probe": "tsx scripts/media/import-media.ts --probe",
-    "media:collect-review": "tsx scripts/media/collect-review-candidates.ts"
+    "media:collect-review": "tsx scripts/media/collect-review-candidates.ts",
+    "media:approve-review": "tsx scripts/media/approve-review-candidates.ts --confirm=OWNER_ACCEPTS_UNVERIFIED_OFFICIAL_REFERENCES",
+    "media:sync-approved": "tsx scripts/media/sync-approved-media.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1109.0",

@@ -14,7 +14,7 @@ export default async function SourcesPage({ params, searchParams }: { params: Pr
   const characters = await listCharacters({ locale });
   const rows = (await Promise.all(characters.map(async (character) => {
     const view = await getCharacterView(character.id, locale);
-    const assetSources = view.assets.filter((asset) => asset.workflowStatus === "PUBLISHED" && asset.sourceUrl).map((asset) => ({ id: asset.id, character: character.name, label: asset.label, sourceLabel: asset.sourceLabel ?? asset.sourceKind ?? "Source record", sourceUrl: asset.sourceUrl!, license: asset.licenseName ?? (asset.sourceKind === "AI_GENERATED" ? "AI GENERATED" : "SOURCE ON FILE") }));
+    const assetSources = view.assets.filter((asset) => asset.workflowStatus === "PUBLISHED" && asset.sourceUrl).map((asset) => ({ id: asset.id, character: character.name, label: asset.label, sourceLabel: asset.sourceLabel ?? asset.sourceKind ?? "Source record", sourceUrl: asset.sourceUrl!, license: [asset.permissionStatus, asset.licenseName ?? (asset.sourceKind === "AI_GENERATED" ? "AI GENERATED" : "SOURCE ON FILE")].filter(Boolean).join(" · ") }));
     if (!assetSources.length && view.sourceAttribution) return [{ id: view.sourceAttribution.id, character: character.name, label: character.sourceTitle ?? character.title, sourceLabel: view.sourceAttribution.sourceLabel, sourceUrl: view.sourceAttribution.sourceUrl, license: view.sourceAttribution.licenseName }];
     return assetSources;
   }))).flat();
