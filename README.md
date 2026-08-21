@@ -129,7 +129,7 @@ npm run dev
 - The repository includes a full Prisma schema for the target production model.
 - Runtime market, reward, shop, watchlist, comment, reaction, and comfort flows are backed by Prisma/Postgres.
 - Production builds never push schema changes or seed data.
-- Render applies committed Prisma migrations before starting Next.js. The Blueprint seeds once through `initialDeployHook` after the first successful deploy.
+- Render applies committed Prisma migrations before starting Next.js. The deployment bootstrap seeds only an empty database; later restarts preserve user data and only synchronize approved media metadata.
 
 ## Render deployment
 
@@ -146,12 +146,12 @@ Render uses these lifecycle commands:
 
 ```text
 Build: npm ci && npm run prisma:generate && npm run build
-Start: npx prisma migrate deploy && npm run start -- -H 0.0.0.0 -p $PORT
-First deploy only: npm run db:seed
+Start: npx prisma migrate deploy && npm run db:bootstrap && npm run start -- -H 0.0.0.0 -p $PORT
+Initial deploy hook: npm run db:bootstrap
 Health check: /api/health
 ```
 
-The health endpoint performs a lightweight `SELECT 1`, returns `200` only when PostgreSQL is reachable, and returns `503` without exposing database errors otherwise. Existing services that were already initialized do not rerun `initialDeployHook`; seed manually only when that database has not already been populated.
+The health endpoint performs a lightweight `SELECT 1`, returns `200` only when PostgreSQL is reachable, and returns `503` without exposing database errors otherwise. `db:bootstrap` checks for existing characters before seeding, so manual Docker services and Blueprint services can share the same safe startup path without resetting an initialized database.
 
 ## Content policy
 

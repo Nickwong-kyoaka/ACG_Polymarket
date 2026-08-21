@@ -16,6 +16,7 @@
     "prisma:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:bootstrap": "tsx prisma/bootstrap.ts",
     "db:beta-reset": "tsx prisma/beta-reset.ts --confirm=RESET_ACG_BETA",
     "media:validate": "tsx scripts/media/import-media.ts --dry-run",
     "media:probe": "tsx scripts/media/import-media.ts --probe",

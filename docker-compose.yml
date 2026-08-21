@@ -40,7 +40,7 @@ services:
       sh -c "npm ci &&
              npm run prisma:generate &&
              npx prisma migrate deploy &&
-             npm run db:seed &&
+             npm run db:bootstrap &&
              npm run dev -- -H 0.0.0.0"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
