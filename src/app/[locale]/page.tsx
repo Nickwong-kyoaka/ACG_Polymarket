@@ -8,9 +8,12 @@ import { MissionPanel } from "@/components/mission-panel";
 import { RewardClaimPanel } from "@/components/reward-claim-panel";
 import { SeasonTicker } from "@/components/season-ticker";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { selectDailyCover } from "@/lib/editorial-cover";
 import { getPositiveMarketFeed } from "@/lib/market-feed";
+import { listPublicGallery } from "@/lib/public-media";
 import { currencyLabel } from "@/lib/utils";
 import { getCommentCount, getCurrentViewer, getMeDashboard, getRecentTrades, getShopItems, getWatchlistIds, listCharacters } from "@/lib/store";
+import { getHongKongDayKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -18,18 +21,26 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
   const { locale: rawLocale } = await params;
   if (!isPublicLocale(rawLocale)) notFound();
   const locale = rawLocale;
-  const [featured, recentTrades, shopItems, watchlistIds, viewer, marketFeed] = await Promise.all([
+  const [featured, recentTrades, shopItems, watchlistIds, viewer, marketFeed, gallery] = await Promise.all([
     listCharacters({ featuredOnly: true, locale }),
     getRecentTrades(6),
     getShopItems(locale),
     getWatchlistIds().catch(() => [] as string[]),
     getCurrentViewer().catch(() => null),
     getPositiveMarketFeed({ featuredOnly: true, limit: 5, locale }),
+    listPublicGallery({ locale, limit: 24 }),
   ]);
   const dashboard = viewer ? await getMeDashboard(viewer.user.id, locale).catch(() => null) : null;
-  const heroSource = featured.find((character) => character.rightsType === "ORIGINAL") ?? featured[0];
+  const galleryBySlug = new Map(gallery.items.map((entry) => [entry.character.slug, entry.assets]));
+  const coverCandidates = featured.filter((character) => (galleryBySlug.get(character.slug)?.length ?? 0) > 0);
+  const heroSource = selectDailyCover(coverCandidates, getHongKongDayKey()) ?? featured.find((character) => character.rightsType === "ORIGINAL") ?? featured[0];
   if (!heroSource) notFound();
   const hero = localizeCharacter(heroSource, locale);
+  const assetFor = (slug: string) => {
+    const asset = galleryBySlug.get(slug)?.[0];
+    return asset ? { publicUrl: asset.url, altText: asset.altText, sourceLabel: asset.sourceLabel, sourceKind: asset.sourceKind, permissionStatus: asset.permissionBadge } : undefined;
+  };
+  const heroAsset = assetFor(heroSource.slug);
   const cards = await Promise.all(featured.slice(0, 4).map(async (character) => ({ character, comments: await getCommentCount(character.id) })));
   const completedMissions = dashboard?.missions.filter((mission) => mission.completed).length ?? 0;
   const activeShift = dashboard?.work.shifts.find((shift) => shift.status === "ACTIVE" || shift.status === "READY");
@@ -43,7 +54,7 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
     mission: "完成任務", shift: "打工狀態", watching: "關注角色", alerts: "訊號提醒", none: "尚未開始", ready: "可領取",
     guestTitle: "建立你的第一本應援手帳", guestBody: "登入會建立錢包並送出一次性的 300 SUP。之後可以簽到、打工、支持角色和收藏外觀。", signIn: "登入並領取 300 SUP",
     feedKicker: "即時應援抄錄", feedTitle: "最近有人替喜歡留下了紀錄", feedBody: "只顯示正向活動與回收份數，不以獲利或虧損煽動比較。",
-    boothKicker: "收藏攤位", boothTitle: "替自己的房間換一個版本", boothBody: "頭像框、主題與原創壁紙只改變收藏體驗，不增加市場優勢。", booth: "查看全部收藏",
+    boothKicker: "收藏攤位", boothTitle: "替自己的房間換一個版本", boothBody: "頭像框、主題與原創壁紙只改變收藏體驗，不增加市場優勢。", booth: "查看全部收藏", coverCycle: "每日封面輪替",
   } : {
     issue: "ISSUE 08", season: "SUMMER 2026 SUPPORT CATALOG", title: "Keep showing up for the characters you love.",
     lede: "No loser board, no fandom war. Earn SUP, collect favorites, move shared milestones, and step into a comfort room when you need one.",
@@ -53,7 +64,7 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
     mission: "Missions done", shift: "Work shift", watching: "Watching", alerts: "Signal alerts", none: "Not started", ready: "Ready to claim",
     guestTitle: "Start your first support notebook", guestBody: "Signing in creates your wallet and grants 300 starter SUP once. Check in, take shifts, support characters, and collect room looks.", signIn: "Sign in and claim 300 SUP",
     feedKicker: "Live support log", feedTitle: "Someone just left a record for a favorite", feedBody: "The log shows support and returned units without turning profit or loss into social pressure.",
-    boothKicker: "Collection booth", boothTitle: "Give your room a different edition", boothBody: "Frames, themes, and original wallpapers change your collection space, never market power.", booth: "View all collectibles",
+    boothKicker: "Collection booth", boothTitle: "Give your room a different edition", boothBody: "Frames, themes, and original wallpapers change your collection space, never market power.", booth: "View all collectibles", coverCycle: "Daily cover rotation",
   };
 
   return (
@@ -62,7 +73,7 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
       <div className="exchange-page">
         <section className="editorial-cover grid overflow-hidden lg:grid-cols-[1.08fr_.92fr]">
           <div className="editorial-hero-art group relative min-h-[430px] sm:min-h-[560px] lg:min-h-[700px]">
-            <CharacterArt character={hero} className="absolute inset-0 h-full" priority sizes="(min-width: 1024px) 58vw, 100vw" />
+            <CharacterArt character={hero} asset={heroAsset} className="absolute inset-0 h-full" priority sizes="(min-width: 1024px) 58vw, 100vw" />
             <div className="absolute left-4 top-4 z-10 bg-[#f2ca61] px-3 py-2 text-[#181713] sm:left-6 sm:top-6">
               <p className="text-[9px] font-black tracking-[.16em]">{copy.issue} / COVER</p>
             </div>
@@ -86,10 +97,17 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
           </div>
         </section>
 
+        <nav aria-label={copy.coverCycle} className="-mt-10 grid gap-px border border-black bg-black sm:grid-cols-3 xl:grid-cols-6">
+          {coverCandidates.slice(0, 6).map((character) => {
+            const active = character.id === heroSource.id;
+            return <Link key={character.id} href={localePath(locale, `/character/${character.slug}`)} className={`flex min-h-20 items-center justify-between gap-3 px-4 py-3 text-xs font-black transition ${active ? "bg-[#f2ca61] text-[#181713]" : "bg-[#fffaf0] text-slate-500 hover:bg-white hover:text-[#bd3628]"}`}><span className="line-clamp-2">{localizeCharacter(character, locale).name}</span><span className="font-display text-xl">{active ? "●" : "○"}</span></Link>;
+          })}
+        </nav>
+
         <section className="grid gap-7">
           <div className="grid gap-6 lg:grid-cols-[1fr_310px] lg:items-end"><SectionHeading eyebrow={copy.featuredKicker} title={copy.featuredTitle} description={copy.featuredBody} /><div className="folio-number justify-self-end">01</div></div>
           <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
-            {cards.map(({ character, comments }) => <CharacterCard key={character.id} character={character} watching={watchlistIds.includes(character.id)} commentCount={comments} locale={locale} />)}
+            {cards.map(({ character, comments }) => <CharacterCard key={character.id} character={character} asset={assetFor(character.slug)} watching={watchlistIds.includes(character.id)} commentCount={comments} locale={locale} />)}
           </div>
         </section>
 

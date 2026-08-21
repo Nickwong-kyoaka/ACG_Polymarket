@@ -25,6 +25,7 @@ export interface ApprovedMediaEntry {
   altText: { en: string; "zh-Hant": string };
   publicationDecision: ApprovedMediaDecision;
   decisionReason: string;
+  displayOrder?: number;
 }
 
 export interface ApprovedMediaManifest {
@@ -43,7 +44,6 @@ export const approvedMediaManifest = manifestJson as ApprovedMediaManifest;
 export function validateApprovedMediaManifest(manifest: ApprovedMediaManifest = approvedMediaManifest) {
   const errors: string[] = [];
   const ids = new Set<string>();
-  const slugs = new Set<string>();
 
   if (manifest.schemaVersion !== 1) errors.push("Approved-media schema version must be 1.");
   if (!Number.isFinite(Date.parse(manifest.approvedAt))) errors.push("Approved-media approval timestamp is invalid.");
@@ -52,9 +52,7 @@ export function validateApprovedMediaManifest(manifest: ApprovedMediaManifest = 
 
   for (const entry of manifest.entries) {
     if (ids.has(entry.candidateId)) errors.push(`Duplicate approved-media candidate id: ${entry.candidateId}.`);
-    if (slugs.has(entry.characterSlug)) errors.push(`Duplicate approved-media character slug: ${entry.characterSlug}.`);
     ids.add(entry.candidateId);
-    slugs.add(entry.characterSlug);
     if (!entry.sourcePageUrl.startsWith("https://") || !entry.sourceMediaUrl.startsWith("https://")) errors.push(`${entry.characterSlug} requires HTTPS source URLs.`);
     if (entry.permissionStatus !== "UNVERIFIED" || entry.adEligible !== false) errors.push(`${entry.characterSlug} must remain unverified and ad-disabled.`);
     if (!entry.altText.en.trim() || !entry.altText["zh-Hant"].trim()) errors.push(`${entry.characterSlug} requires English and Traditional Chinese alt text.`);

@@ -107,7 +107,7 @@ export async function syncApprovedMedia(db: ApprovedMediaClient = prisma) {
       reviewNotes: entry.decisionReason,
       riskAcknowledgedById: reviewer?.id,
       riskAcknowledgedAt: approvedAt,
-      primaryPriority: 300,
+      primaryPriority: Math.max(200, 300 - (entry.displayOrder ?? 0)),
     };
 
     await db.characterAsset.upsert({

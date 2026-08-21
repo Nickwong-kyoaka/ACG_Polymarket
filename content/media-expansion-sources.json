@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-21T05:50:00.000Z",
+  "entries": [
+    {
+      "id": "date-a-live-rio-tohka-outfits",
+      "characterSlug": "yatogami-tohka",
+      "sourcePageUrl": "https://ifi.games/date-a-live/chara/index.php",
+      "creatorName": "Idea Factory International / Date A Live: Rio Reincarnation",
+      "creatorUrl": "https://ifi.games/date-a-live/",
+      "media": [
+        {
+          "url": "https://ifi.games/date-a-live/img/chara/c02_img1.jpg",
+          "label": "Astral Dress"
+        },
+        {
+          "url": "https://ifi.games/date-a-live/img/chara/c02_img2.jpg",
+          "label": "Winter uniform"
+        },
+        {
+          "url": "https://ifi.games/date-a-live/img/chara/c02_img3.jpg",
+          "label": "Summer uniform"
+        },
+        {
+          "url": "https://ifi.games/date-a-live/img/chara/c02_img4.jpg",
+          "label": "Autumn casual clothes"
+        },
+        {
+          "url": "https://ifi.games/date-a-live/img/chara/c02_img5.jpg",
+          "label": "Summer casual clothes"
+        }
+      ]
+    },
+    {
+      "id": "date-a-live-ren-dystopia-kurumi-outfits",
+      "characterSlug": "tokisaki-kurumi",
+      "sourcePageUrl": "https://ifi.games/date-a-live-ren-dystopia/chara/?page=kurumi",
+      "creatorName": "Idea Factory International / Date A Live: Ren Dystopia",
+      "creatorUrl": "https://ifi.games/date-a-live-ren-dystopia/",
+      "media": [
+        {
+          "url": "https://ifi.games/date-a-live-ren-dystopia/img/chara/kurumi_cos1.png",
+          "label": "Casual outfit"
+        },
+        {
+          "url": "https://ifi.games/date-a-live-ren-dystopia/img/chara/kurumi_cos2.png",
+          "label": "Astral Dress"
+        }
+      ]
+    }
+  ]
+}

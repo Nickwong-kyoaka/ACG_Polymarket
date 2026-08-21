@@ -38,6 +38,50 @@ function visualAsset(entry: (typeof catalogCharactersV2)[number], index: number)
   };
 }
 
+function originalAlternateAssets(): CharacterAsset[] {
+  return [{
+    id: "asset-akari-night-support",
+    characterId: characterId("akari-hoshino"),
+    kind: "HERO",
+    label: "Akari Hoshino midnight support outfit",
+    storageKey: "assets/characters/akari-hoshino-night-support.png",
+    publicUrl: "/assets/characters/akari-hoshino-night-support.png",
+    altText: "AI-generated full-body illustration of Akari Hoshino in a cream star cardigan, coral skirt, navy tights, and ankle boots on a lantern-lit rooftop.",
+    workflowStatus: "PUBLISHED",
+    publishedAt: "2026-08-21T05:45:00.000Z",
+    version: 1,
+    rightsGrantId: "rights-original",
+    sourceKind: "AI_GENERATED",
+    sourceLabel: "ACG Exchange AI original · provenance recorded",
+    attributionText: "Generated for the ACG Polymarket original character catalog using the existing Akari Hoshino key visual as an identity reference.",
+    takedownContact: "wongnick.kyoaka@gmail.com",
+    licenseName: "Platform original AI-assisted artwork",
+    mimeType: "image/png",
+    byteSize: 2_430_500,
+    aiPrompt: "Preserve Akari Hoshino's orange-coral hair, amber eyes, turquoise accent strands, and star ornaments; create a full-body cozy midnight rooftop support outfit with a cream cardigan, coral skirt, navy tights, ankle boots, and signal radio; SFW; no text or branding.",
+    aiModel: "OpenAI built-in image generation (model identifier not exposed)",
+    permissionStatus: "VERIFIED",
+    contentRating: "SFW",
+    creatorName: "ACG Polymarket with OpenAI image generation",
+    permissionEvidence: "Generated inside the project task at the site owner's request on 2026-08-21.",
+    commercialUseAllowed: true,
+    adaptationAllowed: true,
+    retrievedAt: "2026-08-21T05:45:00.000Z",
+    checksum: "99dbb650d64d9b6d18f0da9e34e268b3844cd5afaafd7b5a322ba7e24bf69f3f",
+    reviewedAt: "2026-08-21T05:45:00.000Z",
+    reviewNotes: "Identity, outfit, hands, composition, and SFW presentation visually reviewed before publication.",
+    riskAcknowledgedAt: "2026-08-21T05:45:00.000Z",
+    primaryPriority: 90,
+    metadata: {
+      generatedAt: "2026-08-21T05:45:00.000Z",
+      referenceAsset: "assets/characters/akari-hoshino-hero.png",
+      referenceProvenance: "Existing platform-original Akari key visual",
+      altTextZhHant: "AI 生成的星野燈里全身圖；她在燈籠照亮的屋頂穿著奶油色星星針織外套、珊瑚色短裙、深藍色褲襪與短靴。",
+      adEligible: true,
+    },
+  }];
+}
+
 export function buildSeedSnapshotV2(legacy: SeedSnapshot): SeedSnapshot {
   const bySeries = new Map<string, string[]>();
   for (const entry of catalogCharactersV2) bySeries.set(entry.seriesSlug, [...(bySeries.get(entry.seriesSlug) ?? []), characterId(entry.slug)]);
@@ -98,7 +142,7 @@ export function buildSeedSnapshotV2(legacy: SeedSnapshot): SeedSnapshot {
     series: catalogSeriesV2.map((entry) => ({ id: seriesId(entry.slug), slug: entry.slug, title: entry.title.en, summary: `Character support catalog for ${entry.title.en}.`, rightsType: entry.rightsType, metadataOnly: entry.rightsType !== "ORIGINAL" })),
     rightsGrants: legacy.rightsGrants.filter((grant) => grant.id === "rights-original"),
     sourceAttributions: catalogCharactersV2.map((entry) => ({ id: `source-${entry.slug}`, characterId: characterId(entry.slug), sourceKind: "MANUAL", sourceLabel: entry.authoritativeSource.label, sourceUrl: entry.authoritativeSource.url ?? "https://github.com/Nickwong-kyoaka/ACG_Polymarket", licenseName: entry.seriesSlug === "starlit-cadence" ? "Platform original" : "Metadata reference only", attributionText: entry.seriesSlug === "starlit-cadence" ? "ACG Exchange original character catalog." : "Character identity and series metadata reference; no media reuse grant asserted.", importedAt: entry.authoritativeSource.retrievedAt })),
-    assets: [...catalogCharactersV2.map(visualAsset), ...legacy.assets.filter((asset) => !asset.characterId && ["asset-frame-sakura", "asset-theme-sunrise", "asset-wallpaper-comfort-archive"].includes(asset.id)).map((asset) => {
+    assets: [...catalogCharactersV2.map(visualAsset), ...originalAlternateAssets(), ...legacy.assets.filter((asset) => !asset.characterId && ["asset-frame-sakura", "asset-theme-sunrise", "asset-wallpaper-comfort-archive"].includes(asset.id)).map((asset) => {
       const paths: Record<string, string> = { "asset-frame-sakura": "assets/cosmetics/sakura-ring-frame.svg", "asset-theme-sunrise": "assets/cosmetics/sunrise-support-theme.svg", "asset-wallpaper-comfort-archive": "assets/cosmetics/comfort-archive-wallpaper.svg" };
       return { ...asset, storageKey: paths[asset.id], publicUrl: `/${paths[asset.id]}`, sourceKind: "PLATFORM_ORIGINAL" as const, permissionStatus: "VERIFIED" as const, contentRating: "SFW" as const, licenseName: "ACG Exchange original vector", attributionText: "Original vector cosmetic created for ACG Exchange+ V2.", primaryPriority: 100 };
     })],

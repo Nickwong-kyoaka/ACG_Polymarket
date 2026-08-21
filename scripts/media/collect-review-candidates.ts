@@ -19,6 +19,17 @@ interface SourceManifest {
   entries: SourceEntry[];
 }
 
+interface ExpansionManifest {
+  entries: Array<{
+    id: string;
+    characterSlug: string;
+    sourcePageUrl: string;
+    creatorName: string;
+    creatorUrl: string | null;
+    media: Array<{ url: string; label: string }>;
+  }>;
+}
+
 interface ReviewCandidate {
   id: string;
   characterSlug: string;
@@ -76,10 +87,12 @@ const projectRoot = process.cwd();
 const outputRoot = path.join(projectRoot, "review-media");
 const candidateRoot = path.join(outputRoot, "candidates");
 const sourceManifestPath = path.join(projectRoot, "content", "media-sources.json");
+const expansionManifestPath = path.join(projectRoot, "content", "media-expansion-sources.json");
 const reviewManifestPath = path.join(outputRoot, "review-manifest.json");
 const htmlLimit = 3 * 1024 * 1024;
 const imageLimit = 8 * 1024 * 1024;
 const maxCharacters = Number(process.argv.find((argument) => argument.startsWith("--limit="))?.split("=")[1] ?? "24");
+const maxOfficialPerSource = Math.min(6, Math.max(1, Number(process.argv.find((argument) => argument.startsWith("--per-source="))?.split("=")[1] ?? "3")));
 
 function escapeHtml(value: string | null | undefined) {
   return (value ?? "")
@@ -297,13 +310,14 @@ async function main() {
     const sourcePageUrl = source.originalPage!;
     try {
       const page = await fetchPublicHtml(sourcePageUrl);
-      const imageUrls = extractOfficialImages(page.html, page.finalUrl, source.characterSlug).slice(0, 12);
+      const imageUrls = extractOfficialImages(page.html, page.finalUrl, source.characterSlug).slice(0, Math.max(12, maxOfficialPerSource * 6));
       if (!imageUrls.length) throw new Error("No public HTTPS image candidate was found in the source markup.");
-      let saved: ReviewCandidate | null = null;
+      const saved: ReviewCandidate[] = [];
       const rejectedReasons: string[] = [];
       for (const imageUrl of imageUrls) {
+        if (saved.length >= maxOfficialPerSource) break;
         try {
-          saved = await saveCandidate({
+          const candidate = await saveCandidate({
             characterSlug: source.characterSlug,
             sourceKind: "OFFICIAL_REFERENCE",
             imageUrl,
@@ -315,13 +329,13 @@ async function main() {
             notes: "Public official-page candidate. No reuse permission was inferred; keep ad-disabled until separately cleared.",
             previous: previousByUrl.get(imageUrl),
           });
-          break;
+          if (!saved.some((entry) => entry.normalizedSha256 === candidate.normalizedSha256)) saved.push(candidate);
         } catch (error) {
           rejectedReasons.push(error instanceof Error ? error.message : String(error));
         }
       }
-      if (!saved) throw new Error(`No safe raster candidate passed validation: ${[...new Set(rejectedReasons)].join("; ")}`);
-      candidates.push(saved);
+      if (!saved.length) throw new Error(`No safe raster candidate passed validation: ${[...new Set(rejectedReasons)].join("; ")}`);
+      candidates.push(...saved);
     } catch (error) {
       failures.push({ characterSlug: source.characterSlug, sourceKind: "OFFICIAL_REFERENCE", sourcePageUrl, reason: error instanceof Error ? error.message : String(error) });
     }
@@ -348,17 +362,52 @@ async function main() {
     }
   });
 
-  candidates.sort((left, right) => left.characterSlug.localeCompare(right.characterSlug) || left.sourceKind.localeCompare(right.sourceKind));
+  let expansionManifest: ExpansionManifest = { entries: [] };
+  try {
+    expansionManifest = JSON.parse(await readFile(expansionManifestPath, "utf8")) as ExpansionManifest;
+  } catch {
+    // The explicit expansion list is optional for projects that only use the base manifest.
+  }
+  await mapLimit(expansionManifest.entries, 3, async (source) => {
+    for (const media of source.media) {
+      try {
+        candidates.push(await saveCandidate({
+          characterSlug: source.characterSlug,
+          sourceKind: "OFFICIAL_REFERENCE",
+          imageUrl: media.url,
+          sourcePageUrl: source.sourcePageUrl,
+          creatorName: source.creatorName,
+          creatorUrl: source.creatorUrl,
+          licenseName: null,
+          licenseUrl: null,
+          notes: `${media.label}. Explicit public official-page candidate from ${source.id}; no reuse permission was inferred.`,
+          previous: previousByUrl.get(media.url),
+        }));
+      } catch (error) {
+        failures.push({
+          characterSlug: source.characterSlug,
+          sourceKind: "OFFICIAL_REFERENCE",
+          sourcePageUrl: source.sourcePageUrl,
+          reason: `${media.label}: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    }
+  });
+
+  const uniqueCandidates = [...new Map(candidates.map((candidate) => [candidate.id, candidate])).values()];
+  uniqueCandidates.sort((left, right) => left.characterSlug.localeCompare(right.characterSlug)
+    || left.sourceKind.localeCompare(right.sourceKind)
+    || left.sourceMediaUrl.localeCompare(right.sourceMediaUrl));
   const manifest: ReviewManifest = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
     warning: "Review-only local copies. Approval does not grant rights or publish an asset. Verify source, permission, attribution, SFW status, and ad eligibility in admin before use.",
-    candidates,
+    candidates: uniqueCandidates,
     failures,
   };
   await writeFile(reviewManifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   await writeFile(path.join(outputRoot, "index.html"), renderContactSheet(manifest), "utf8");
-  process.stdout.write(`Review inbox ready: ${candidates.length} candidates, ${failures.length} unresolved.\nOpen ${path.join(outputRoot, "index.html")}\n`);
+  process.stdout.write(`Review inbox ready: ${uniqueCandidates.length} candidates, ${failures.length} unresolved.\nOpen ${path.join(outputRoot, "index.html")}\n`);
 }
 
 main().catch((error) => {

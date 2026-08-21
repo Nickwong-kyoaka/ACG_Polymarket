@@ -4,7 +4,7 @@ import { approvedMediaManifest, validateApprovedMediaManifest } from "@/data/app
 describe("owner-approved media manifest", () => {
   it("records every reviewed candidate without treating approval as a license", () => {
     expect(validateApprovedMediaManifest()).toEqual([]);
-    expect(approvedMediaManifest.entries).toHaveLength(20);
+    expect(approvedMediaManifest.entries).toHaveLength(31);
     expect(approvedMediaManifest.legalNotice).toContain("not evidence of a copyright license");
     expect(approvedMediaManifest.realAdsAllowed).toBe(false);
     expect(approvedMediaManifest.thirdPartyBytesCommittedToGit).toBe(false);
@@ -14,7 +14,7 @@ describe("owner-approved media manifest", () => {
     const publishable = approvedMediaManifest.entries.filter((entry) => entry.publicationDecision === "PUBLISH_UNVERIFIED");
     const reviewOnly = approvedMediaManifest.entries.filter((entry) => entry.publicationDecision === "REVIEW_ONLY");
 
-    expect(publishable).toHaveLength(17);
+    expect(publishable).toHaveLength(28);
     expect(reviewOnly.map((entry) => entry.characterSlug).sort()).toEqual([
       "roxy-migurdia",
       "rudeus-greyrat",

@@ -2,7 +2,7 @@ import type { CharacterAsset } from "@/lib/types";
 
 export type PublicCharacterAsset = Pick<
   CharacterAsset,
-  "id" | "kind" | "label" | "altText" | "sourceKind" | "sourceUrl" | "sourceLabel" | "licenseName" | "publicUrl" | "storageKey"
+  "id" | "kind" | "label" | "altText" | "sourceKind" | "sourceUrl" | "sourceLabel" | "licenseName" | "publicUrl" | "storageKey" | "primaryPriority"
 > & { permissionBadge?: string };
 
 const visualKinds = ["HERO", "CARD", "THUMB", "WALLPAPER"] as const;
@@ -28,6 +28,7 @@ export function toPublicAsset(asset: CharacterAsset): PublicCharacterAsset | und
     licenseName: asset.licenseName,
     publicUrl: renderedUrl,
     storageKey: asset.storageKey,
+    primaryPriority: asset.primaryPriority,
     permissionBadge: asset.permissionStatus ?? (asset.sourceKind === "AI_GENERATED" ? "AI GENERATED" : asset.sourceKind?.replaceAll("_", " ")),
   };
 }
@@ -39,7 +40,10 @@ export function publishedVisuals(assets: CharacterAsset[]) {
       const publicAsset = toPublicAsset(asset);
       return publicAsset && priority.has(asset.kind as typeof visualKinds[number]) ? [publicAsset] : [];
     })
-    .sort((left, right) => (priority.get(left.kind as typeof visualKinds[number]) ?? 99) - (priority.get(right.kind as typeof visualKinds[number]) ?? 99));
+    .sort((left, right) => {
+      const kindOrder = (priority.get(left.kind as typeof visualKinds[number]) ?? 99) - (priority.get(right.kind as typeof visualKinds[number]) ?? 99);
+      return kindOrder || (right.primaryPriority ?? 0) - (left.primaryPriority ?? 0);
+    });
 }
 
 export function pageAllowsRealAds(assets: Array<Pick<CharacterAsset, "sourceKind" | "metadata">>) {

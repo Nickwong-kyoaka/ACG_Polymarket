@@ -53,6 +53,7 @@ function assetDto(asset: PublicAssetRecord, locale: PublicMediaLocale) {
     height: media.height,
     altText: localized?.altText ?? asset.altText,
     sourceLabel: asset.sourceLabel ?? asset.sourceKind.replaceAll("_", " "),
+    sourceKind: asset.sourceKind,
     sourceUrl: asset.sourceUrl,
     creatorName: asset.creatorName,
     creatorUrl: asset.creatorUrl,

@@ -1,6 +1,6 @@
 # Local media review inbox
 
-`npm run media:collect-review` builds a local `review-media/` folder from the official source pages already recorded in `content/media-sources.json` and from Openverse search results when available.
+`npm run media:collect-review` builds a local `review-media/` folder from the official source pages recorded in `content/media-sources.json`, explicit outfit URLs in `content/media-expansion-sources.json`, and Openverse search results when available. It keeps up to three distinct automatically discovered official-page candidates per source by default so outfit, expression, and alternate-era visuals can be reviewed together; use `--per-source=1..6` to adjust the limit.
 
 The collector:
 

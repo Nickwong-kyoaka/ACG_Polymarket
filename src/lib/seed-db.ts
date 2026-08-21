@@ -441,7 +441,10 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
     if (asset.characterId) {
       const catalog = catalogCharactersV2.find((entry) => `char-${entry.slug}` === asset.characterId || ({ "akari-hoshino": "char-akari", "ren-tsukishiro": "char-ren", "mira-kagetsu": "char-mira", "yatogami-tohka": "char-tohka", "tokisaki-kurumi": "char-kurumi" }[entry.slug] === asset.characterId));
       if (catalog) {
-        for (const [locale, altText] of [["EN", asset.altText], ["ZH_HANT", `${catalog.name["zh-Hant"]} 的${catalog.seriesSlug === "starlit-cadence" ? "平台原創 AI 主視覺" : "抽象應援訊號立繪；未內含第三方角色圖片"}。`]] as const) {
+        const zhHantAltText = typeof asset.metadata?.altTextZhHant === "string"
+          ? asset.metadata.altTextZhHant
+          : `${catalog.name["zh-Hant"]} 的${catalog.seriesSlug === "starlit-cadence" ? "平台原創 AI 主視覺" : "抽象應援訊號立繪；未內含第三方角色圖片"}。`;
+        for (const [locale, altText] of [["EN", asset.altText], ["ZH_HANT", zhHantAltText]] as const) {
           await db.characterAssetLocale.upsert({ where: { assetId_locale: { assetId: asset.id, locale } }, create: { assetId: asset.id, locale, altText }, update: { altText } });
         }
       }
