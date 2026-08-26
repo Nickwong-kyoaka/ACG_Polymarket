@@ -1,5 +1,6 @@
 import type { Character, ShopItem } from "@/lib/types";
 import { catalogCharactersV2, catalogSeriesV2 } from "@/data/catalog-v2";
+import { getCharacterVoiceProfile } from "@/data/character-voices";
 
 export const publicLocales = ["en", "zh-Hant"] as const;
 
@@ -55,7 +56,7 @@ const characterCopy: Record<
     "zh-Hant": {
       name: "星野明里",
       title: "《星光節拍》的訊號隊長",
-      summary: "明里把每一個舞台都變成明天仍會閃耀的約定。她讓應援成為一起發光，而不是只能選一邊的競賽。",
+      summary: "明里把每一個舞台都變成明天仍會閃耀的約定。她總能牽起身邊的手，讓整片觀眾席一起亮起來。",
       fandomPrompt: "如果你喜歡坦率的領導力、重新振作與舞台上的太陽，請把今天的心意交給明里。",
       favoritePhrase: "你已經走到這裡了，下一段路讓我們一起發光。",
     },
@@ -65,7 +66,7 @@ const characterCopy: Record<
     "zh-Hant": {
       name: "月城蓮",
       title: "《星光節拍》的戰術作曲家",
-      summary: "蓮讀懂趨勢、旋律與人群的情緒，卻從不把粉絲變成對手。支持他像是在收藏一段安靜而可靠的才華。",
+      summary: "蓮讀懂趨勢、旋律與人群的情緒，也懂得替每一份沒說出口的心意留下空間。支持他像是在收藏一段安靜而可靠的才華。",
       fandomPrompt: "如果你喜歡沉著的戰略家、深夜歌單與不喧鬧的陪伴，蓮會替你留一盞燈。",
       favoritePhrase: "不必急著回答世界，先聽完屬於你的這一小節。",
     },
@@ -77,7 +78,7 @@ const characterCopy: Record<
       title: "《星光節拍》的百變舞者",
       summary: "米菈最喜歡觀眾發現自己可以同時喜歡很多角色的瞬間。她的路線屬於快樂收藏家、壁紙獵人與驚喜派對。",
       fandomPrompt: "想要爆發力、調皮互動與期間限定外觀，就把應援棒揮向米菈。",
-      favoritePhrase: "喜歡不需要排他，心裡的位置比你想像中更多。",
+      favoritePhrase: "心裡的位置比想像中更多，每一份喜歡都可以好好住下來。",
     },
   },
   "shiori-archive": {
@@ -169,15 +170,19 @@ export function localizeAttribute<T extends { key: string; label: string; value:
   attribute: T,
   locale: PublicLocale,
 ): T {
-  if (locale === "en") return attribute;
+  if (locale === "en") {
+    if (attribute.key === "voice_tone") return { ...attribute, value: `${getCharacterVoiceProfile(character.slug).style.en} synth direction` };
+    if (attribute.key === "comfort_style") return { ...attribute, value: "Character-specific comfort line, synth voice, and gentle company" };
+    return attribute;
+  }
   const archetypes: Record<string, string> = { Leader: "領隊", Strategist: "戰略家", Wildcard: "百變型", Healer: "療癒型" };
   let value = attribute.value;
   if (attribute.key === "archetype") value = archetypes[value] ?? value;
   if (attribute.key === "market_affinity") value = `適合想以收藏、陪伴與正向留言支持 ${localizeCharacter(character, locale).name} 的粉絲。`;
   if (attribute.key === "crew_role") value = character.metadataOnly ? "作品資料應援席" : "原創角色企劃成員";
-  if (attribute.key === "source_policy") value = character.metadataOnly ? "只展示可追蹤來源的作品資料，不包含官方媒體素材。" : "原創角色與平台自有示範素材。";
-  if (attribute.key === "comfort_style") value = "以角色語氣提供溫柔陪伴，不使用角色對立或勝負語言。";
-  if (attribute.key === "voice_tone") value = character.metadataOnly ? "待授權或原創示範音訊上架" : "依角色氣質設計的原創示範聲線";
+  if (attribute.key === "source_policy") value = character.metadataOnly ? "作品資料、圖片來源與整理狀態都收在公開來源手帳。" : "原創角色與平台自有示範素材。";
+  if (attribute.key === "comfort_style") value = "以角色語氣、專屬台詞與合成聲線提供溫柔陪伴。";
+  if (attribute.key === "voice_tone") value = `${getCharacterVoiceProfile(character.slug).style["zh-Hant"]}的合成聲線`;
   if (attribute.key === "asmr_tags") value = character.tags.map((tag) => `#${tag}`).join("  ");
   if (attribute.key === "external_score_snapshot") value = "外部站點資料快照，更新日期與來源請查看下方標記。";
   return { ...attribute, label: attributeLabels[attribute.key] ?? attribute.label, value };
@@ -212,7 +217,7 @@ export const exchangeCopy = {
   en: {
     nav: { home: "Lobby", market: "Signals", campaigns: "Campaigns", gallery: "Gallery", comfort: "Comfort", shop: "Booth", work: "Work", me: "My room" },
     common: { original: "Original IP", metadata: "Metadata signal", quote: "Support quote", supporters: "Supporters", comments: "Messages", units: "units", open: "Enter signal", watch: "Watch", watching: "Watching", signIn: "Sign in", sup: "SUP" },
-    trade: { title: "Support ticket", buyQuote: "Buy quote", sellQuote: "Return quote", balance: "Wallet", held: "Held", quantity: "Units", buy: "Send support", sell: "Return units", notice: "System exchange only. No shorting, P2P orders, cash-out, or character-versus-character bets.", failed: "The exchange could not complete this action.", bought: "Support sent successfully.", sold: "Units returned successfully.", signIn: "Sign in to send support" },
+    trade: { title: "Support ticket", buyQuote: "Buy quote", sellQuote: "Return quote", balance: "Wallet", held: "Held", quantity: "Units", buy: "Send support", sell: "Return units", notice: "The platform desk holds this quote for 30 seconds. Review the total, then leave the support note in your collection.", failed: "The exchange could not complete this action.", bought: "Support sent successfully.", sold: "Units returned successfully.", signIn: "Sign in to send support" },
     rewards: { title: "Daily energy", daily: "Claim +100", ad: "Rewarded ad +20", dailyDone: "Daily SUP received.", adDone: "Rewarded SUP received.", failed: "Reward could not be claimed." },
     shop: { unlock: "Unlock", equipped: "Equipped", equipAgain: "Equip", done: "Cosmetic unlocked and equipped.", failed: "Could not complete this booth order.", owned: "In collection" },
     comments: { placeholder: "Write what you love about this character...", post: "Leave a message", posted: "Your message joined the support wall.", failed: "Message could not be posted.", reactFailed: "Reaction could not be sent.", supporter: "Supporter", guest: "guest", cheer: "Cheer", heart: "Heart", hype: "Spark" },
@@ -220,7 +225,7 @@ export const exchangeCopy = {
   "zh-Hant": {
     nav: { home: "大廳", market: "訊號", campaigns: "應援活動", gallery: "畫廊", comfort: "安慰室", shop: "攤位", work: "打工", me: "我的房間" },
     common: { original: "原創 IP", metadata: "資料型訊號", quote: "目前應援價", supporters: "應援者", comments: "留言", units: "份", open: "進入角色訊號", watch: "關注", watching: "關注中", signIn: "登入", sup: "SUP" },
-    trade: { title: "應援票券", buyQuote: "支持價格", sellQuote: "退回價格", balance: "錢包", held: "持有", quantity: "份數", buy: "送出應援", sell: "退回份數", notice: "只與系統交換，不設做空、玩家配對、出金或角色對賭。", failed: "交易站未能完成這次操作。", bought: "應援已成功送達。", sold: "應援份數已退回。", signIn: "登入後送出應援" },
+    trade: { title: "應援票券", buyQuote: "支持價格", sellQuote: "退回價格", balance: "錢包", held: "持有", quantity: "份數", buy: "送出應援", sell: "退回份數", notice: "系統會替這張票保留報價 30 秒。確認總額後，這份心意就會加入你的收藏。", failed: "交易站未能完成這次操作。", bought: "應援已成功送達。", sold: "應援份數已退回。", signIn: "登入後送出應援" },
     rewards: { title: "每日能量", daily: "簽到 +100", ad: "獎勵廣告 +20", dailyDone: "今天的 SUP 已入帳。", adDone: "廣告獎勵 SUP 已入帳。", failed: "暫時無法領取獎勵。" },
     shop: { unlock: "解鎖", equipped: "已裝備", equipAgain: "裝備", done: "外觀已解鎖並裝備。", failed: "攤位未能完成這次兌換。", owned: "已收藏" },
     comments: { placeholder: "寫下你喜歡這個角色的原因……", post: "留下心意", posted: "你的心意已加入應援牆。", failed: "暫時無法送出留言。", reactFailed: "暫時無法送出反應。", supporter: "應援者", guest: "訪客", cheer: "加油", heart: "心動", hype: "閃耀" },

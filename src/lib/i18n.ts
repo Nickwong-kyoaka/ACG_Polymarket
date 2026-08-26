@@ -51,21 +51,21 @@ export const localeCopy = {
     },
     home: {
       eyebrow: "Anime fandom support lounge",
-      title: "Turn character love into a glowing support booth, not a faction war.",
+      title: "Come home to the characters you keep thinking about.",
       description:
-        "Earn soft SUP tokens, support favorites, collect avatar frames and AI-style wallpapers, then leave a sweet comment without loser boards or PVP pressure.",
+        "Earn soft SUP, support favorites, collect avatar frames and wallpapers, then leave a small note beside the character who made your day.",
       marketCta: "Enter support market",
       onboardingCta: "Start onboarding",
       comfortCta: "Open comfort room",
       walletEyebrow: "Current demo wallet",
       walletLabel: "Soft balance",
       walletBody:
-        "Starter balance, daily check-ins, rewarded ads, and system sell-back feed the loop.",
-      rulesTitle: "House vibe",
+        "Starter SUP, daily check-ins, character shifts, and return quotes keep the room moving.",
+      rulesTitle: "Around the room",
       rules: [
-        "No shorting, no cash-out, no rival-fan humiliation.",
-        "Licensed entries stay metadata-first with attribution markers.",
-        "Cosmetics express affection; they do not create gameplay advantage.",
+        "Support tickets show their platform quote before confirmation.",
+        "Character galleries keep source notes close to every image.",
+        "Frames, themes, and wallpapers make the room feel like yours.",
       ],
       featuredEyebrow: "Featured booths",
       featuredTitle: "Launch characters with support energy",
@@ -82,7 +82,7 @@ export const localeCopy = {
         },
         {
           title: "Support favorites",
-          body: "System-priced support units move quotes without P2P orders, shorting, or cash-out framing.",
+          body: "Preview a platform quote, choose a quantity, and keep the support units on your character shelf.",
         },
         {
           title: "Unlock ACG flair",
@@ -90,7 +90,7 @@ export const localeCopy = {
         },
       ],
       activityEyebrow: "Live ribbon",
-      activityTitle: "Activity reads like cheers, not profit flexing",
+      activityTitle: "Activity feels like notes left beside a favorite",
       activityDescription:
         "The feed highlights who received support instead of ranking characters as winners and losers.",
       cosmeticsEyebrow: "Shop preview",
@@ -102,7 +102,7 @@ export const localeCopy = {
       eyebrow: "Support market",
       title: "Browse character booths",
       description:
-        "Search by title, tag, or rights type. The board is organized around support momentum and comfort fit, never head-to-head conflict.",
+        "Search by title, tag, source, or the kind of company you want nearby today.",
       searchPlaceholder: "Search by name, title, or tag",
       tagPlaceholder: "Tag e.g. idol",
       allRights: "All rights types",
@@ -134,7 +134,7 @@ export const localeCopy = {
       buy: "Buy support",
       sell: "Sell back",
       notice:
-        "Positive-only support market: no shorting, no player-to-player order book, and no cash-out.",
+        "The platform desk holds each previewed quote briefly so you can check the total before sending support.",
       buyDone: "Support units added.",
       sellDone: "Support units sold back.",
       failed: "Trade failed.",
@@ -181,7 +181,7 @@ export const localeCopy = {
       eyebrow: "Healing fandom room",
       title: "Sweet support for days when your favorite character feels like home.",
       description:
-        "Pick a comfort mode, read soft lines, preview voice and ASMR slots, then support a character without rivalry or pressure.",
+        "Pick a comfort mode, read soft lines, hear a character voice, and carry the moment back to your room.",
       chooseCta: "Choose a comfort mode",
       marketCta: "Visit support market",
       tonight: "Tonight preview",
@@ -242,20 +242,20 @@ export const localeCopy = {
     },
     home: {
       eyebrow: "新番角色應援 Lounge",
-      title: "把對角色的喜歡變成發光的應援攤位，而不是黨爭戰場。",
+      title: "回到那些總會讓你想起的角色身邊。",
       description:
-        "每日簽到賺 SUP 軟代幣，支持喜歡的角色，兌換頭像框與 AI 風壁紙，再留下甜甜的喜歡。沒有踩一捧一，沒有 PVP 壓力。",
+        "每日領取 SUP、支持喜歡的角色、收藏頭像框與壁紙，再把一句心意留在讓你開心的角色身邊。",
       marketCta: "進入應援市場",
       onboardingCta: "開始新手流程",
       comfortCta: "打開安慰室",
       walletEyebrow: "目前 Demo 錢包",
       walletLabel: "軟代幣餘額",
-      walletBody: "啟動金、每日簽到、獎勵廣告與賣回系統，形成不出金的站內循環。",
-      rulesTitle: "本站氣氛",
+      walletBody: "起始 SUP、每日簽到、角色打工與退回報價，讓房間每天都有一點新進度。",
+      rulesTitle: "房間裡的小事",
       rules: [
-        "不做空、不出金、不羞辱其他角色廚。",
-        "授權作品先以資料與來源標記展示。",
-        "頭像框與壁紙是表達喜愛，不是戰力優勢。",
+        "每張應援票券都會先顯示平台報價。",
+        "角色畫廊會替每張圖片留下來源手帳。",
+        "頭像框、主題與壁紙會讓房間更像自己。",
       ],
       featuredEyebrow: "推薦攤位",
       featuredTitle: "第一波帶著應援能量登場的角色",
@@ -271,7 +271,7 @@ export const localeCopy = {
         },
         {
           title: "支持本命",
-          body: "由系統池定價，沒有玩家對賭、做空、出金與收益炫耀。",
+          body: "先看看系統報價與總額，再把應援份數收進自己的角色架。",
         },
         {
           title: "解鎖 ACG 外觀",
@@ -290,7 +290,7 @@ export const localeCopy = {
       eyebrow: "應援市場",
       title: "瀏覽角色攤位",
       description:
-        "用作品、標籤或權利類型搜尋。排行語言只看應援熱度與陪伴屬性，不做角色對立。",
+        "用作品、標籤、素材來源或今天需要的陪伴方式，找到想多看一眼的角色。",
       searchPlaceholder: "搜尋角色、作品或標籤",
       tagPlaceholder: "標籤，例如 idol",
       allRights: "所有權利類型",
@@ -303,7 +303,7 @@ export const localeCopy = {
       attributeEyebrow: "角色屬性表",
       attributeTitle: "ACG 屬性、安慰風格與市場訊號",
       attributeDescription:
-        "甜度、聲線、角色類型、來源作品與應援數據放在一起，但不做黨爭排行榜。",
+        "甜度、聲線、角色類型、來源作品與應援數據，都收進同一張角色手帳。",
       rightsEyebrow: "權利與來源",
       rightsTitle: "素材與引用文字保持可追蹤",
       rightsDescription:
@@ -321,7 +321,7 @@ export const localeCopy = {
       quantity: "份數",
       buy: "買入應援",
       sell: "賣回系統",
-      notice: "正向應援市場：不做空、無玩家撮合、不提供出金。",
+      notice: "平台會短暫保留預覽報價，讓你確認總額後再把心意送出。",
       buyDone: "已增加應援份數。",
       sellDone: "已賣回系統。",
       failed: "交易失敗。",

@@ -18,9 +18,9 @@ export default async function GalleryPage({ params }: { params: Promise<{ locale
     return { character, asset: publishedVisuals(view.assets)[0] };
   }));
   const copy = locale === "zh-Hant" ? {
-    eyebrow: "PUBLISHED VISUAL ARCHIVE", title: "角色畫廊，每張圖都有自己的履歷。", body: "平台原創、AI 生成、開放授權與未驗證參考素材會分開標示。沒有可發布圖片的角色使用訊號立繪，不會冒充官方素材。", count: `${entries.length} 個角色訊號`, note: "外部圖片由 S3/CDN 提供；下架後不會殘留在 Git 歷史。",
+    eyebrow: "CHARACTER GALLERY", title: "翻開角色衣櫥，也看看每張圖從哪裡來。", body: "平台原創、AI 生成、開放授權與官方參考素材都有自己的小標籤；正在整理圖片的角色會先保留一張訊號海報。", count: `${entries.length} 個角色畫廊`, note: "來源記錄會跟著圖片一起留在畫廊，方便查閱與聯絡。",
   } : {
-    eyebrow: "PUBLISHED VISUAL ARCHIVE", title: "A character gallery where every image has a record.", body: "Original, AI-generated, open-license, and unverified reference lanes are visibly separated. Characters without a publishable image use signal art rather than pretending to be official media.", count: `${entries.length} character signals`, note: "External image bytes are served from S3/CDN and never committed to Git history.",
+    eyebrow: "CHARACTER GALLERY", title: "Open the wardrobe and see where every image came from.", body: "Original, AI-generated, open-license, and official-reference visuals each carry a small label. Characters whose galleries are still being prepared keep a signal poster in their place.", count: `${entries.length} character galleries`, note: "Source records travel with the image so visitors can read more or get in touch.",
   };
   return <div className="exchange-page">
     <header className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end"><SectionHeading eyebrow={copy.eyebrow} title={copy.title} description={copy.body} /><div className="rounded-[18px_5px_18px_5px] bg-[#111827] px-5 py-4 text-sm font-black text-white"><Aperture className="mr-2 inline h-4 w-4 text-[#ffcc66]" />{copy.count}</div></header>

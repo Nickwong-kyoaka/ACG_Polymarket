@@ -1,4 +1,5 @@
 import { catalogCharactersV2, catalogSeriesV2 } from "@/data/catalog-v2";
+import { getCharacterVoiceProfile } from "@/data/character-voices";
 import { calculateBuyBatchCost } from "@/lib/market";
 import type { Character, CharacterAsset, LedgerEntry, SeedSnapshot, Trade } from "@/lib/types";
 
@@ -100,7 +101,7 @@ export function buildSeedSnapshotV2(legacy: SeedSnapshot): SeedSnapshot {
         { definitionId: "attr-archetype", value: entry.tags.en[0] ?? "Support signal" }, { definitionId: "attr-affinity", value: entry.fandomPrompt.en },
         { definitionId: "attr-role", value: entry.headline.en }, { definitionId: "attr-vibe", value: String(78 + (index * 7) % 21) },
         { definitionId: "attr-source", value: entry.authoritativeSource.label }, { definitionId: "attr-sweetness", value: String(76 + (index * 11) % 23) },
-        { definitionId: "attr-comfort-style", value: entry.comfortStyle.en }, { definitionId: "attr-voice-tone", value: "Voice metadata pending licensed or original upload" },
+        { definitionId: "attr-comfort-style", value: entry.comfortStyle.en }, { definitionId: "attr-voice-tone", value: `${getCharacterVoiceProfile(entry.slug).style.en} synth direction` },
         { definitionId: "attr-asmr-tags", value: entry.tags.en.join(", ") }, { definitionId: "attr-external-score", value: "No live score snapshot; source page retained for review" },
       ], assetIds: [`asset-${entry.slug}-primary`], rightsGrantIds: entry.seriesSlug === "starlit-cadence" ? ["rights-original"] : [], sourceAttributionId: `source-${entry.slug}`,
     };

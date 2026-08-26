@@ -24,8 +24,8 @@ const modeTranslations: Record<string, Record<PublicLocale, ModeTranslation>> = 
     "zh-Hant": { title: "睡眠小巢", subtitle: "晚安前的小宇宙", description: "低對比文字、環境音與安靜分鏡，陪腦內仍然吵鬧的你慢慢關燈。", promptLabel: "我想睡，但腦袋停不下來", tag: "入睡" },
   },
   "low-confidence": {
-    en: { title: "Confidence Patch", subtitle: "You are not a defective draft", description: "Affectionate encouragement for self-doubt without turning it into fake motivation.", promptLabel: "I feel like I am not good enough", tag: "Courage" },
-    "zh-Hant": { title: "自信補丁", subtitle: "你不是失敗品", description: "不喊空洞口號，只用角色的語氣看見你的努力，讓自我懷疑暫時小聲一點。", promptLabel: "我覺得自己不夠好", tag: "勇氣" },
+    en: { title: "Confidence Patch", subtitle: "Find your footing again", description: "Warm character encouragement that notices the effort already present and makes the next step feel reachable.", promptLabel: "I want to feel steady again", tag: "Courage" },
+    "zh-Hant": { title: "自信補丁", subtitle: "慢慢找回自己的步伐", description: "讓角色看見你已經付出的努力，再陪你把下一步縮到剛好可以做到。", promptLabel: "我想重新站穩一點", tag: "勇氣" },
   },
   heartbreak: {
     en: { title: "Heartbreak Cocoa", subtitle: "A broken heart can still be held", description: "Tender, non-judgmental comfort for missing someone, rejection, or relationship grief.", promptLabel: "My heart hurts and I need something sweet", tag: "Repair" },
@@ -70,7 +70,7 @@ export function MiniComic({ mode, locale }: { mode: ComfortMode; locale: PublicL
     `The ${title} sign turns on.`,
     "A character lowers the volume of everything outside.",
     "One gentle line lands on the desk with your name on it.",
-    "The final panel does not rush you: tomorrow is allowed.",
+    "The final panel leaves a warm light on for tomorrow.",
   ];
   return <figure className="exchange-panel overflow-hidden bg-[#111827]"><Image src={`/assets/comfort/comfort-four-panel-${locale}.svg`} alt={locale === "zh-Hant" ? "原創四格安慰漫畫：走進房間、降低雜音、收到溫柔訊息，最後把明天留給明天。" : "Original four-panel comfort comic about entering, quieting the noise, receiving kindness, and leaving tomorrow for tomorrow."} width={1600} height={900} className="h-auto w-full" unoptimized /><figcaption className="sr-only">{panels.join(" ")}</figcaption></figure>;
 }

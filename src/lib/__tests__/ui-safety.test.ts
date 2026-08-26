@@ -8,14 +8,18 @@ const rulesPage = fs.readFileSync(
   "utf8",
 );
 
-describe("anti-conflict UI copy", () => {
-  it("includes explicit no-shorting guidance", () => {
-    expect(localizedCopy).toContain("No shorting");
-    expect(rulesPage).toContain("There is no shorting");
+describe("welcoming product copy", () => {
+  it("explains the product through actions and room language", () => {
+    expect(localizedCopy).toContain("holds this quote for 30 seconds");
+    expect(rulesPage).toContain("Source notes travel with every image");
   });
 
-  it("avoids rivalry-first language", () => {
-    expect(localizedCopy.toLowerCase()).not.toContain("loser board");
-    expect(localizedCopy.toLowerCase()).not.toContain("beat yours");
+  it("keeps defensive prohibition copy out of the main interface", () => {
+    const publicCopy = `${localizedCopy}\n${rulesPage}`.toLowerCase();
+    expect(publicCopy).not.toContain("no shorting");
+    expect(publicCopy).not.toContain("loser board");
+    expect(publicCopy).not.toContain("faction war");
+    expect(publicCopy).not.toContain("不做空");
+    expect(publicCopy).not.toContain("敗者榜");
   });
 });

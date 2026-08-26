@@ -180,8 +180,8 @@ export const catalogCharactersV2: CatalogCharacterV2[] = [
     originalName: "花月ミラ",
     headline: { en: "Wildcard Dancer", "zh-Hant": "驚喜舞者" },
     summary: {
-      en: "A playful choreographer who celebrates collecting many favorites without turning affection into rivalry.",
-      "zh-Hant": "充滿玩心的編舞者，相信喜歡多個角色不需要競爭，也能一起大聲慶祝。",
+      en: "A playful choreographer who turns every new favorite into another reason for the whole collection to celebrate.",
+      "zh-Hant": "充滿玩心的編舞者，每遇見一名新的本命，就替整個收藏櫃多準備一場慶祝。",
     },
     fandomPrompt: { en: "Support playful energy and surprise drops.", "zh-Hant": "為俏皮能量與驚喜掉落應援。" },
     tags: { en: ["dance", "wildcard", "collector"], "zh-Hant": ["舞蹈", "驚喜", "收藏"] },

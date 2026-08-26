@@ -46,25 +46,25 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
   const activeShift = dashboard?.work.shifts.find((shift) => shift.status === "ACTIVE" || shift.status === "READY");
 
   const copy = locale === "zh-Hant" ? {
-    issue: "第 08 期", season: "2026 夏季應援場刊", title: "喜歡誰，就替誰留下應援紀錄。",
-    lede: "這裡沒有角色敗者榜。領取 SUP、收藏角色、一起完成應援里程碑，也在需要時走進安慰室。",
-    enter: "翻開角色目錄", comfort: "進入安慰室", wallet: "可用 SUP", live: "本期封面角色",
-    featuredKicker: "本期角色索引", featuredTitle: "從今天想陪伴你的角色開始", featuredBody: "價格只反映站內支持份數；喜歡可以並存，也不需要和任何人爭輸贏。",
-    deskKicker: "今日應援桌", deskTitle: "登入後，今天該做的事都在這裡", deskBody: "任務、打工、簽到、關注與提醒使用真實帳戶資料，不是展示用數字。",
+    issue: "第 08 期", season: "2026 夏季應援場刊", title: "歡迎回來。今天想和誰待在一起？",
+    lede: "翻翻新番、遇見角色，把心動收進自己的房間。每日 SUP、應援里程碑與安慰語音，會陪你把喜歡慢慢養成日常。",
+    enter: "翻開角色目錄", comfort: "去安慰室坐坐", wallet: "房間裡的 SUP", live: "今天的封面角色",
+    featuredKicker: "本期角色索引", featuredTitle: "從一名讓你想多看一眼的角色開始", featuredBody: "按作品、氣質或陪伴方式慢慢逛；角色小傳、服裝畫廊與今晚的語音都已經準備好。",
+    deskKicker: "今日小桌", deskTitle: "今天想做的事，都放在手邊了", deskBody: "簽到、任務、角色打工與收藏提醒會跟著你的房間一起更新。",
     mission: "完成任務", shift: "打工狀態", watching: "關注角色", alerts: "訊號提醒", none: "尚未開始", ready: "可領取",
     guestTitle: "建立你的第一本應援手帳", guestBody: "登入會建立錢包並送出一次性的 300 SUP。之後可以簽到、打工、支持角色和收藏外觀。", signIn: "登入並領取 300 SUP",
-    feedKicker: "即時應援抄錄", feedTitle: "最近有人替喜歡留下了紀錄", feedBody: "只顯示正向活動與回收份數，不以獲利或虧損煽動比較。",
-    boothKicker: "收藏攤位", boothTitle: "替自己的房間換一個版本", boothBody: "頭像框、主題與原創壁紙只改變收藏體驗，不增加市場優勢。", booth: "查看全部收藏", coverCycle: "每日封面輪替",
+    feedKicker: "最近來訪", feedTitle: "有人剛剛把心意留在角色身邊", feedBody: "每一筆應援都像場刊邊上的手寫註記，記下誰在此刻被想起。",
+    boothKicker: "房間收藏", boothTitle: "替自己的角落換上今天的心情", boothBody: "頭像框、主題與原創壁紙會直接加入收藏櫃，想換時隨時回來。", booth: "逛逛收藏攤位", coverCycle: "今天的封面選角",
   } : {
-    issue: "ISSUE 08", season: "SUMMER 2026 SUPPORT CATALOG", title: "Keep showing up for the characters you love.",
-    lede: "No loser board, no fandom war. Earn SUP, collect favorites, move shared milestones, and step into a comfort room when you need one.",
-    enter: "Open character index", comfort: "Enter a comfort room", wallet: "Available SUP", live: "Issue cover character",
-    featuredKicker: "Character index", featuredTitle: "Start with the character you want nearby today", featuredBody: "Quotes only reflect in-platform support units. Favorites can coexist, and affection is not a contest.",
-    deskKicker: "Today's support desk", deskTitle: "Your actual tasks, rewards, and signals in one place", deskBody: "Missions, work, check-in, watchlist, and alerts come from your account rather than decorative demo numbers.",
+    issue: "ISSUE 08", season: "SUMMER 2026 SUPPORT CATALOG", title: "Welcome back. Who do you want beside you today?",
+    lede: "Browse the new season, meet a character, and bring that spark into your room. Daily SUP, shared milestones, and comfort voices turn affection into a small ritual.",
+    enter: "Open the character catalog", comfort: "Sit in a comfort room", wallet: "SUP in your room", live: "Today's cover character",
+    featuredKicker: "Character index", featuredTitle: "Start with someone who makes you look twice", featuredBody: "Browse by series, mood, or kind of company. Character notes, outfit galleries, and a voice for tonight are ready inside.",
+    deskKicker: "Today's little desk", deskTitle: "Everything you may want today, within reach", deskBody: "Check-in, missions, character shifts, and collection reminders update with your room.",
     mission: "Missions done", shift: "Work shift", watching: "Watching", alerts: "Signal alerts", none: "Not started", ready: "Ready to claim",
     guestTitle: "Start your first support notebook", guestBody: "Signing in creates your wallet and grants 300 starter SUP once. Check in, take shifts, support characters, and collect room looks.", signIn: "Sign in and claim 300 SUP",
-    feedKicker: "Live support log", feedTitle: "Someone just left a record for a favorite", feedBody: "The log shows support and returned units without turning profit or loss into social pressure.",
-    boothKicker: "Collection booth", boothTitle: "Give your room a different edition", boothBody: "Frames, themes, and original wallpapers change your collection space, never market power.", booth: "View all collectibles", coverCycle: "Daily cover rotation",
+    feedKicker: "Recent visitors", feedTitle: "Someone just left a little affection beside a character", feedBody: "Each support entry feels like a handwritten note in the catalog, remembering who crossed someone's mind.",
+    boothKicker: "Room collection", boothTitle: "Dress your corner in today's mood", boothBody: "Frames, themes, and original wallpapers join your collection shelf and stay ready whenever the room needs a change.", booth: "Browse the collection booth", coverCycle: "Today's cover picks",
   };
 
   return (
@@ -97,10 +97,10 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
           </div>
         </section>
 
-        <nav aria-label={copy.coverCycle} className="-mt-10 grid gap-px border border-black bg-black sm:grid-cols-3 xl:grid-cols-6">
+        <nav aria-label={copy.coverCycle} className="-mt-10 grid overflow-hidden rounded-[22px_7px_22px_7px] border border-[#6d5e54]/20 bg-[#e7d9ca] shadow-[0_14px_35px_rgba(72,53,43,.1)] sm:grid-cols-3 xl:grid-cols-6">
           {coverCandidates.slice(0, 6).map((character) => {
             const active = character.id === heroSource.id;
-            return <Link key={character.id} href={localePath(locale, `/character/${character.slug}`)} className={`flex min-h-20 items-center justify-between gap-3 px-4 py-3 text-xs font-black transition ${active ? "bg-[#f2ca61] text-[#181713]" : "bg-[#fffaf0] text-slate-500 hover:bg-white hover:text-[#bd3628]"}`}><span className="line-clamp-2">{localizeCharacter(character, locale).name}</span><span className="font-display text-xl">{active ? "●" : "○"}</span></Link>;
+            return <Link key={character.id} href={localePath(locale, `/character/${character.slug}`)} className={`flex min-h-20 items-center justify-between gap-3 border-r border-[#6d5e54]/10 px-4 py-3 text-xs font-black transition ${active ? "bg-[#e6b86d] text-[#342a25]" : "bg-[#fffaf4] text-slate-500 hover:bg-white hover:text-[#a34855]"}`}><span className="line-clamp-2">{localizeCharacter(character, locale).name}</span><span className="font-display text-xl">{active ? "●" : "○"}</span></Link>;
           })}
         </nav>
 
