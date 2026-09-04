@@ -139,6 +139,11 @@ enum LedgerReferenceType {
   BUY_SUPPORT
   SELL_SUPPORT
   SHOP_PURCHASE
+  PREDICTION_BUY
+  PREDICTION_SELL
+  PREDICTION_FEE
+  PREDICTION_PAYOUT
+  PREDICTION_REFUND
 }
 
 enum CommentStatus {
@@ -186,37 +191,157 @@ enum SourceKind {
   BANGUMI
 }
 
+enum PostKind {
+  NOTE
+  OUTFIT
+  COMIC
+  VOICE
+  GUIDE
+  PREDICTION_TAKE
+}
+
+enum PostStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  HELD
+  REMOVED
+}
+
+enum PostMediaStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  PULLED
+}
+
+enum CreatorStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum LibraryStatus {
+  WANT
+  WATCHING
+  COMPLETED
+  ON_HOLD
+  DROPPED
+}
+
+enum EpisodeProgressStatus {
+  PLANNED
+  WATCHED
+  SKIPPED
+}
+
+enum EntityType {
+  SERIES
+  CHARACTER
+  PERSON
+  EPISODE
+  POST
+}
+
+enum EditProposalStatus {
+  DRAFT
+  SUBMITTED
+  NEEDS_CHANGES
+  APPROVED
+  REJECTED
+}
+
+enum ReviewDecisionKind {
+  REQUEST_CHANGES
+  APPROVE
+  REJECT
+}
+
+enum ContributorTrustKind {
+  PROPOSAL_ACCEPTED
+  PROPOSAL_REJECTED
+  REVISION_REVERTED
+  SOURCE_VERIFIED
+  MODERATION_ACTION
+}
+
+enum PredictionMarketStatus {
+  DRAFT
+  OPEN
+  LOCKED
+  PROPOSED
+  CHALLENGE
+  RESOLVED
+  VOID
+}
+
+enum PredictionTradeSide {
+  BUY
+  SELL
+}
+
+enum PredictionResolutionStatus {
+  PROPOSED
+  CHALLENGED
+  CONFIRMED
+  VOIDED
+}
+
 model User {
-  id                    String                 @id @default(cuid())
-  email                 String?                @unique
-  name                  String?
-  image                 String?
-  role                  UserRole               @default(USER)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  authIdentities        AuthIdentity[]
-  sessions              Session[]
-  profile               Profile?
-  wallet                Wallet?
-  positions             SupportPosition[]
-  trades                Trade[]
-  dailyRewards          DailyRewardClaim[]
-  adRewards             AdRewardClaim[]
-  watchlistItems        WatchlistItem[]
-  comments              Comment[]
-  reactions             Reaction[]
-  reports               Report[]
-  notifications         Notification[]
-  inventoryItems        InventoryItem[]
-  comfortSessions       ComfortSession[]
-  comfortReactions      ComfortReaction[]
-  idempotency           IdempotencyRecord[]
-  missionProgress       DailyMissionProgress[]
-  workShifts            WorkShift[]
-  campaignContributions CampaignContribution[]
-  marketAlerts          MarketAlert[]
-  assetAuditLogs        AssetAuditLog[]
-  takedownRequests      TakedownRequest[]
+  id                     String                      @id @default(cuid())
+  email                  String?                     @unique
+  name                   String?
+  image                  String?
+  role                   UserRole                    @default(USER)
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+  authIdentities         AuthIdentity[]
+  sessions               Session[]
+  profile                Profile?
+  wallet                 Wallet?
+  positions              SupportPosition[]
+  trades                 Trade[]
+  dailyRewards           DailyRewardClaim[]
+  adRewards              AdRewardClaim[]
+  watchlistItems         WatchlistItem[]
+  comments               Comment[]
+  reactions              Reaction[]
+  reports                Report[]
+  notifications          Notification[]
+  notificationPreference NotificationPreference?
+  analyticsEvents        AnalyticsEvent[]
+  inventoryItems         InventoryItem[]
+  comfortSessions        ComfortSession[]
+  comfortReactions       ComfortReaction[]
+  idempotency            IdempotencyRecord[]
+  missionProgress        DailyMissionProgress[]
+  workShifts             WorkShift[]
+  campaignContributions  CampaignContribution[]
+  marketAlerts           MarketAlert[]
+  assetAuditLogs         AssetAuditLog[]
+  takedownRequests       TakedownRequest[]
+  posts                  Post[]                      @relation("PostAuthor")
+  postSaves              PostSave[]
+  postReactions          PostReaction[]
+  followingUsers         UserFollow[]                @relation("UserFollowFollower")
+  followers              UserFollow[]                @relation("UserFollowTarget")
+  characterFollows       CharacterFollow[]
+  topicFollows           TopicFollow[]
+  collections            Collection[]
+  creatorProfile         CreatorProfile?
+  creatorSeries          CreatorSeries[]
+  creatorSubscriptions   CreatorSeriesSubscription[]
+  libraryEntries         LibraryEntry[]
+  episodeProgress        EpisodeProgress[]
+  ratings                UserRating[]
+  curatedLists           CuratedList[]
+  editProposals          EditProposal[]              @relation("EditProposalAuthor")
+  reviewDecisions        ReviewDecision[]            @relation("ReviewDecisionReviewer")
+  trustEvents            ContributorTrustEvent[]     @relation("TrustEventUser")
+  authoredTrustEvents    ContributorTrustEvent[]     @relation("TrustEventActor")
+  predictionPositions    PredictionPosition[]
+  predictionTrades       PredictionTrade[]
+  resolutionProposals    ResolutionProposal[]        @relation("ResolutionProposer")
+  resolutionChallenges   ResolutionChallenge[]
 }
 
 model AuthIdentity {
@@ -242,32 +367,39 @@ model Session {
 }
 
 model Profile {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  handle             String   @unique
-  displayName        String
-  bio                String
-  holdingsVisibility Boolean  @default(true)
-  favoriteTags       String[]
-  pinnedCharacterIds String[]
-  equippedFrameAsset String?
-  equippedThemeAsset String?
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                    String     @id @default(cuid())
+  userId                String     @unique
+  handle                String     @unique
+  displayName           String
+  bio                   String
+  holdingsVisibility    Boolean    @default(true)
+  favoriteTags          String[]
+  pinnedCharacterIds    String[]
+  equippedFrameAsset    String?
+  equippedThemeAsset    String?
+  onboardingCompletedAt DateTime?
+  preferredLocale       LocaleCode @default(EN)
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Series {
-  id           String         @id @default(cuid())
-  slug         String         @unique
-  title        String
-  summary      String
-  rightsType   RightsType
-  metadataOnly Boolean        @default(false)
-  bangumiUrl   String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  characters   Character[]
-  rightsGrants RightsGrant[]
-  locales      SeriesLocale[]
+  id             String            @id @default(cuid())
+  slug           String            @unique
+  title          String
+  summary        String
+  rightsType     RightsType
+  metadataOnly   Boolean           @default(false)
+  bangumiUrl     String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  characters     Character[]
+  rightsGrants   RightsGrant[]
+  locales        SeriesLocale[]
+  posts          Post[]
+  episodes       Episode[]
+  libraryEntries LibraryEntry[]
+  ratings        UserRating[]
+  curatedItems   CuratedListItem[]
 }
 
 model SeriesLocale {
@@ -327,6 +459,10 @@ model Character {
   workShifts          WorkShift[]
   supportCampaigns    SupportCampaign[]
   marketAlerts        MarketAlert[]
+  posts               Post[]
+  followers           CharacterFollow[]
+  collectionItems     CollectionItem[]
+  curatedItems        CuratedListItem[]
 }
 
 model CharacterLocale {
@@ -443,6 +579,8 @@ model CharacterAsset {
   locales              CharacterAssetLocale[]
   auditLogs            AssetAuditLog[]
   takedownRequests     TakedownRequest[]
+  postMedia            PostMedia[]
+  collectionItems      CollectionItem[]
 
   @@index([characterId, workflowStatus, primaryPriority])
   @@index([permissionStatus, contentRating])
@@ -719,16 +857,29 @@ model WatchlistItem {
 }
 
 model Comment {
-  id          String        @id @default(cuid())
-  userId      String
-  characterId String
-  content     String
-  status      CommentStatus @default(VISIBLE)
-  updatedAt   DateTime      @updatedAt
-  createdAt   DateTime      @default(now())
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  character   Character     @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  reports     Report[]
+  id                 String            @id @default(cuid())
+  userId             String
+  characterId        String?
+  postId             String?
+  predictionMarketId String?
+  parentId           String?
+  content            String
+  status             CommentStatus     @default(VISIBLE)
+  pinnedByAuthor     Boolean           @default(false)
+  heartedByAuthor    Boolean           @default(false)
+  updatedAt          DateTime          @updatedAt
+  createdAt          DateTime          @default(now())
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character          Character?        @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  post               Post?             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  predictionMarket   PredictionMarket? @relation(fields: [predictionMarketId], references: [id], onDelete: Cascade)
+  parent             Comment?          @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies            Comment[]         @relation("CommentReplies")
+  reports            Report[]
+
+  @@index([postId, status, createdAt])
+  @@index([predictionMarketId, status, createdAt])
+  @@index([parentId, createdAt])
 }
 
 model Reaction {
@@ -748,6 +899,7 @@ model Report {
   userId      String
   characterId String?
   commentId   String?
+  postId      String?
   reason      String
   detail      String?
   status      ReportStatus @default(OPEN)
@@ -756,6 +908,7 @@ model Report {
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   character   Character?   @relation(fields: [characterId], references: [id], onDelete: SetNull)
   comment     Comment?     @relation(fields: [commentId], references: [id], onDelete: SetNull)
+  post        Post?        @relation(fields: [postId], references: [id], onDelete: SetNull)
 }
 
 model Notification {
@@ -764,9 +917,45 @@ model Notification {
   title     String
   body      String
   type      NotificationType
+  href      String?
+  locale    LocaleCode?
+  metadata  Json?
   readAt    DateTime?
   createdAt DateTime         @default(now())
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model NotificationPreference {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  followedContent   Boolean  @default(true)
+  seriesUpdates     Boolean  @default(true)
+  predictionChanges Boolean  @default(true)
+  predictionClosing Boolean  @default(true)
+  resolutions       Boolean  @default(true)
+  moderationResults Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AnalyticsEvent {
+  id         String      @id @default(cuid())
+  userId     String?
+  sessionKey String?
+  name       String
+  locale     LocaleCode?
+  path       String?
+  referrer   String?
+  source     String?
+  metadata   Json?
+  createdAt  DateTime    @default(now())
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([name, createdAt])
+  @@index([userId, createdAt])
+  @@index([sessionKey, createdAt])
 }
 
 model ShopCollection {
@@ -972,4 +1161,662 @@ model WorkShift {
 
   @@index([userId, dayKey])
   @@index([userId, status])
+}
+
+model Post {
+  id                 String            @id @default(cuid())
+  authorId           String
+  slug               String            @unique
+  language           LocaleCode
+  kind               PostKind          @default(NOTE)
+  status             PostStatus        @default(DRAFT)
+  title              String
+  body               String
+  primaryCharacterId String?
+  seriesId           String?
+  creatorSeriesId    String?
+  sourceUrl          String?
+  aiGenerated        Boolean           @default(false)
+  viewCount          Int               @default(0)
+  publishedAt        DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  author             User              @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  primaryCharacter   Character?        @relation(fields: [primaryCharacterId], references: [id], onDelete: SetNull)
+  series             Series?           @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  creatorSeries      CreatorSeries?    @relation(fields: [creatorSeriesId], references: [id], onDelete: SetNull)
+  media              PostMedia[]
+  topics             PostTopic[]
+  saves              PostSave[]
+  reactions          PostReaction[]
+  comments           Comment[]
+  collectionItems    CollectionItem[]
+  curatedItems       CuratedListItem[]
+  reports            Report[]
+
+  @@index([status, publishedAt])
+  @@index([authorId, status, createdAt])
+  @@index([primaryCharacterId, status, publishedAt])
+  @@index([seriesId, status, publishedAt])
+}
+
+model PostMedia {
+  id           String          @id @default(cuid())
+  postId       String
+  assetId      String?
+  publicUrl    String?
+  storageKey   String?
+  sourceUrl    String?
+  sourceLabel  String?
+  altText      String
+  status       PostMediaStatus @default(PENDING_REVIEW)
+  sortOrder    Int             @default(0)
+  createdAt    DateTime        @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+  post         Post            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  asset        CharacterAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  @@index([postId, status, sortOrder])
+  @@index([status, createdAt])
+}
+
+model Topic {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  description String
+  featured    Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  locales     TopicLocale[]
+  posts       PostTopic[]
+  followers   TopicFollow[]
+}
+
+model TopicLocale {
+  id          String     @id @default(cuid())
+  topicId     String
+  locale      LocaleCode
+  title       String
+  description String
+  topic       Topic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, locale])
+}
+
+model PostTopic {
+  postId  String
+  topicId String
+  post    Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([postId, topicId])
+  @@index([topicId, postId])
+}
+
+model PostSave {
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
+  @@index([postId, createdAt])
+}
+
+model PostReaction {
+  userId    String
+  postId    String
+  kind      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId, kind])
+  @@index([postId, createdAt])
+}
+
+model UserFollow {
+  followerId String
+  targetId   String
+  createdAt  DateTime @default(now())
+  follower   User     @relation("UserFollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  target     User     @relation("UserFollowTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, targetId])
+  @@index([targetId, createdAt])
+}
+
+model CharacterFollow {
+  userId      String
+  characterId String
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@id([userId, characterId])
+  @@index([characterId, createdAt])
+}
+
+model TopicFollow {
+  userId    String
+  topicId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([userId, topicId])
+  @@index([topicId, createdAt])
+}
+
+model Collection {
+  id          String           @id @default(cuid())
+  userId      String
+  slug        String           @unique
+  title       String
+  description String
+  isPublic    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       CollectionItem[]
+
+  @@index([userId, updatedAt])
+}
+
+model CollectionItem {
+  id           String          @id @default(cuid())
+  collectionId String
+  postId       String?
+  characterId  String?
+  assetId      String?
+  note         String?
+  sortOrder    Int             @default(0)
+  createdAt    DateTime        @default(now())
+  collection   Collection      @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  post         Post?           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  character    Character?      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  asset        CharacterAsset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, sortOrder])
+}
+
+model CreatorProfile {
+  id                String        @id @default(cuid())
+  userId            String        @unique
+  status            CreatorStatus @default(ACTIVE)
+  tagline           String        @default("")
+  approvedPostCount Int           @default(0)
+  probationComplete Boolean       @default(false)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CreatorSeries {
+  id          String                      @id @default(cuid())
+  creatorId   String
+  slug        String                      @unique
+  title       String
+  description String
+  kind        PostKind
+  published   Boolean                     @default(true)
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  creator     User                        @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  posts       Post[]
+  subscribers CreatorSeriesSubscription[]
+
+  @@index([creatorId, updatedAt])
+}
+
+model CreatorSeriesSubscription {
+  userId    String
+  seriesId  String
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series    CreatorSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  @@id([userId, seriesId])
+  @@index([seriesId, createdAt])
+}
+
+model Episode {
+  id         String            @id @default(cuid())
+  seriesId   String
+  externalId String?
+  number     Int
+  title      String
+  airAt      DateTime?
+  sourceUrl  String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  series     Series            @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  locales    EpisodeLocale[]
+  progress   EpisodeProgress[]
+
+  @@unique([seriesId, number])
+  @@index([airAt])
+}
+
+model EpisodeLocale {
+  id        String     @id @default(cuid())
+  episodeId String
+  locale    LocaleCode
+  title     String
+  episode   Episode    @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([episodeId, locale])
+}
+
+model Person {
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  name        String
+  description String
+  sourceUrl   String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  locales     PersonLocale[]
+}
+
+model PersonLocale {
+  id          String     @id @default(cuid())
+  personId    String
+  locale      LocaleCode
+  name        String
+  description String
+  person      Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, locale])
+}
+
+model EntityRelation {
+  id           String     @id @default(cuid())
+  sourceType   EntityType
+  sourceId     String
+  targetType   EntityType
+  targetId     String
+  relationType String
+  role         String?
+  sortOrder    Int        @default(0)
+  spoilerLevel Int        @default(0)
+  sourceUrl    String?
+  createdAt    DateTime   @default(now())
+
+  @@unique([sourceType, sourceId, targetType, targetId, relationType])
+  @@index([sourceType, sourceId, sortOrder])
+  @@index([targetType, targetId])
+}
+
+model SourceCitation {
+  id          String     @id @default(cuid())
+  entityType  EntityType
+  entityId    String
+  fieldKey    String
+  sourceLabel String
+  sourceUrl   String
+  licenseName String?
+  retrievedAt DateTime   @default(now())
+  createdAt   DateTime   @default(now())
+
+  @@index([entityType, entityId, fieldKey])
+}
+
+model ExternalSnapshot {
+  id          String     @id @default(cuid())
+  provider    String
+  entityType  EntityType
+  entityId    String
+  externalId  String
+  sourceUrl   String
+  payload     Json
+  checksum    String
+  retrievedAt DateTime   @default(now())
+
+  @@unique([provider, entityType, entityId, checksum])
+  @@index([provider, externalId, retrievedAt])
+}
+
+model LibraryEntry {
+  userId      String
+  seriesId    String
+  status      LibraryStatus
+  private     Boolean       @default(false)
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series      Series        @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  @@id([userId, seriesId])
+  @@index([userId, status, updatedAt])
+}
+
+model EpisodeProgress {
+  userId    String
+  episodeId String
+  status    EpisodeProgressStatus @default(WATCHED)
+  updatedAt DateTime              @updatedAt
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  episode   Episode               @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, episodeId])
+  @@index([userId, updatedAt])
+}
+
+model UserRating {
+  userId    String
+  seriesId  String
+  score     Int
+  note      String?
+  private   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series    Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  @@id([userId, seriesId])
+  @@index([seriesId, score])
+}
+
+model CuratedList {
+  id          String            @id @default(cuid())
+  userId      String
+  slug        String            @unique
+  title       String
+  description String
+  isPublic    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       CuratedListItem[]
+
+  @@index([userId, updatedAt])
+}
+
+model CuratedListItem {
+  id          String      @id @default(cuid())
+  listId      String
+  seriesId    String?
+  characterId String?
+  postId      String?
+  note        String?
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  list        CuratedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  series      Series?     @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  character   Character?  @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  post        Post?       @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([listId, sortOrder])
+}
+
+model EditProposal {
+  id          String             @id @default(cuid())
+  authorId    String
+  entityType  EntityType
+  entityId    String
+  status      EditProposalStatus @default(DRAFT)
+  reason      String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  submittedAt DateTime?
+  author      User               @relation("EditProposalAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  changes     ProposalChange[]
+  decisions   ReviewDecision[]
+
+  @@index([status, createdAt])
+  @@index([entityType, entityId, status])
+}
+
+model ProposalChange {
+  id         String       @id @default(cuid())
+  proposalId String
+  fieldKey   String
+  oldValue   Json?
+  newValue   Json
+  sourceUrl  String
+  proposal   EditProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId, fieldKey])
+}
+
+model EntityRevision {
+  id          String     @id @default(cuid())
+  entityType  EntityType
+  entityId    String
+  revision    Int
+  snapshot    Json
+  summary     String
+  actorUserId String?
+  createdAt   DateTime   @default(now())
+
+  @@unique([entityType, entityId, revision])
+  @@index([entityType, entityId, createdAt])
+}
+
+model ReviewDecision {
+  id         String             @id @default(cuid())
+  proposalId String
+  reviewerId String
+  decision   ReviewDecisionKind
+  note       String
+  createdAt  DateTime           @default(now())
+  proposal   EditProposal       @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  reviewer   User               @relation("ReviewDecisionReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId, createdAt])
+}
+
+model ContributorTrustEvent {
+  id          String               @id @default(cuid())
+  userId      String
+  actorUserId String?
+  kind        ContributorTrustKind
+  points      Int
+  referenceId String?
+  note        String?
+  createdAt   DateTime             @default(now())
+  user        User                 @relation("TrustEventUser", fields: [userId], references: [id], onDelete: Cascade)
+  actor       User?                @relation("TrustEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+model PredictionEvent {
+  id          String                  @id @default(cuid())
+  slug        String                  @unique
+  category    String
+  title       String
+  description String
+  featured    Boolean                 @default(false)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  locales     PredictionEventLocale[]
+  markets     PredictionMarket[]
+
+  @@index([featured, createdAt])
+}
+
+model PredictionEventLocale {
+  id          String          @id @default(cuid())
+  eventId     String
+  locale      LocaleCode
+  title       String
+  description String
+  event       PredictionEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, locale])
+}
+
+model PredictionMarket {
+  id                    String                   @id @default(cuid())
+  eventId               String
+  slug                  String                   @unique
+  question              String
+  description           String
+  status                PredictionMarketStatus   @default(DRAFT)
+  resolutionSourceUrl   String
+  resolutionSourceLabel String
+  timezone              String                   @default("Asia/Hong_Kong")
+  edgeCaseRules         String
+  closesAt              DateTime
+  challengeEndsAt       DateTime?
+  resolvedAt            DateTime?
+  winningOutcomeId      String?
+  liquidityParameter    Int                      @default(20)
+  payoutPerShare        Int                      @default(100)
+  yesShares             Int                      @default(0)
+  noShares              Int                      @default(0)
+  marketVersion         Int                      @default(0)
+  reservedLiability     Int                      @default(0)
+  participantCount      Int                      @default(0)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  event                 PredictionEvent          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  locales               PredictionMarketLocale[]
+  outcomes              PredictionOutcome[]
+  positions             PredictionPosition[]
+  trades                PredictionTrade[]
+  comments              Comment[]
+  oracleSources         OracleSource[]
+  ruleVersions          PredictionRuleVersion[]
+  resolutionProposals   ResolutionProposal[]
+
+  @@index([status, closesAt])
+  @@index([eventId, status])
+}
+
+model PredictionMarketLocale {
+  id            String           @id @default(cuid())
+  marketId      String
+  locale        LocaleCode
+  question      String
+  description   String
+  edgeCaseRules String
+  market        PredictionMarket @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@unique([marketId, locale])
+}
+
+model PredictionOutcome {
+  id                  String               @id @default(cuid())
+  marketId            String
+  key                 String
+  label               String
+  sharesOutstanding   Int                  @default(0)
+  market              PredictionMarket     @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  positions           PredictionPosition[]
+  trades              PredictionTrade[]
+  resolutionProposals ResolutionProposal[]
+
+  @@unique([marketId, key])
+}
+
+model PredictionPosition {
+  id        String            @id @default(cuid())
+  userId    String
+  marketId  String
+  outcomeId String
+  shares    Int               @default(0)
+  totalCost Int               @default(0)
+  settledAt DateTime?
+  payout    Int               @default(0)
+  updatedAt DateTime          @updatedAt
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  market    PredictionMarket  @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  outcome   PredictionOutcome @relation(fields: [outcomeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, outcomeId])
+  @@index([userId, marketId])
+  @@index([marketId, outcomeId, shares])
+}
+
+model PredictionTrade {
+  id                   String              @id @default(cuid())
+  userId               String
+  marketId             String
+  outcomeId            String
+  side                 PredictionTradeSide
+  quantity             Int
+  grossAmount          Int
+  feeAmount            Int
+  netAmount            Int
+  probabilityBeforeBps Int
+  probabilityAfterBps  Int
+  marketVersion        Int
+  idempotencyKey       String              @unique
+  createdAt            DateTime            @default(now())
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  market               PredictionMarket    @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  outcome              PredictionOutcome   @relation(fields: [outcomeId], references: [id], onDelete: Cascade)
+
+  @@index([marketId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model PredictionRuleVersion {
+  id        String           @id @default(cuid())
+  marketId  String
+  version   Int
+  snapshot  Json
+  createdAt DateTime         @default(now())
+  market    PredictionMarket @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@unique([marketId, version])
+}
+
+model OracleSource {
+  id       String           @id @default(cuid())
+  marketId String
+  label    String
+  url      String
+  priority Int              @default(0)
+  market   PredictionMarket @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@index([marketId, priority])
+}
+
+model ResolutionProposal {
+  id              String                     @id @default(cuid())
+  marketId        String
+  outcomeId       String?
+  proposedById    String
+  status          PredictionResolutionStatus @default(PROPOSED)
+  evidenceUrl     String
+  reasoning       String
+  challengeEndsAt DateTime
+  proposedAt      DateTime                   @default(now())
+  resolvedAt      DateTime?
+  market          PredictionMarket           @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  outcome         PredictionOutcome?         @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
+  proposedBy      User                       @relation("ResolutionProposer", fields: [proposedById], references: [id], onDelete: Cascade)
+  challenges      ResolutionChallenge[]
+
+  @@index([marketId, status, proposedAt])
+}
+
+model ResolutionChallenge {
+  id          String             @id @default(cuid())
+  proposalId  String
+  userId      String
+  reason      String
+  evidenceUrl String
+  accepted    Boolean?
+  createdAt   DateTime           @default(now())
+  proposal    ResolutionProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, userId])
+}
+
+model PredictionTreasury {
+  id        String   @id @default("system")
+  balance   Int      @default(50000)
+  reserved  Int      @default(0)
+  updatedAt DateTime @updatedAt
 }

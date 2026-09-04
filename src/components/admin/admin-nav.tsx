@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Database, FileHeart, FlagTriangleRight, Images, LayoutDashboard, ShieldAlert, ShoppingBag } from "lucide-react";
+import { BookCopy, Database, FileHeart, FlagTriangleRight, Gauge, Images, LayoutDashboard, MessagesSquare, ShieldAlert, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const adminLinks = [
@@ -12,6 +12,9 @@ const adminLinks = [
   { href: "/admin/assets", label: "Asset workflow", short: "Assets", icon: Images },
   { href: "/admin/shop", label: "Shop catalog", short: "Shop", icon: ShoppingBag },
   { href: "/admin/campaigns", label: "Campaign control", short: "Campaigns", icon: FlagTriangleRight },
+  { href: "/admin/predictions", label: "Prediction desk", short: "Predict", icon: Gauge },
+  { href: "/admin/community", label: "Community review", short: "Posts", icon: MessagesSquare },
+  { href: "/admin/knowledge", label: "Knowledge revisions", short: "Revisions", icon: BookCopy },
   { href: "/admin/takedowns", label: "Takedown queue", short: "Safety", icon: ShieldAlert },
 ] as const;
 

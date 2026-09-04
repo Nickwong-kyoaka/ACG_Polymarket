@@ -11,7 +11,8 @@ import {
 } from "@/lib/constants";
 import { bangumiImportSamples } from "@/data/bangumi-samples";
 import { prisma } from "@/lib/prisma";
-import { AuthenticationError, AuthorizationError, AppError } from "@/lib/api";
+import { classifyRetryablePrismaConflict, waitForSerializableRetry } from "@/lib/prisma-retry";
+import { AuthenticationError, AuthorizationError, AppError, NotFoundError } from "@/lib/api";
 import { getOptionalSessionUserId } from "@/lib/auth";
 import {
   getBuyQuote,
@@ -65,20 +66,23 @@ function requestHash(payload: unknown) {
 }
 
 async function withSerializableRetry<T>(operation: (tx: Tx) => Promise<T>) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  let lastError: unknown;
+  const maximumRetries = 3;
+  for (let attempt = 0; attempt <= maximumRetries; attempt += 1) {
     try {
       return await prisma.$transaction(operation, balanceTransactionOptions);
     } catch (error) {
-      if (
-        attempt === 2 ||
-        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-        error.code !== "P2034" && error.code !== "P2002"
-      ) {
+      lastError = error;
+      if (!classifyRetryablePrismaConflict(error)) {
         throw error;
       }
+      if (attempt < maximumRetries) await waitForSerializableRetry(attempt + 1);
     }
   }
 
+  if (classifyRetryablePrismaConflict(lastError)) {
+    throw new AppError("The operation met another update. Try again.", 409, "TRANSACTION_CONFLICT");
+  }
   throw new AppError("The operation could not be completed safely. Try again.", 409, "CONFLICT");
 }
 
@@ -1354,15 +1358,31 @@ export async function createReport(input: {
   detail?: string;
   characterId?: string;
   commentId?: string;
+  postId?: string;
   userId?: string;
 }) {
   const user = await requireUser(prisma, input.userId);
+  const [character, comment, post] = await Promise.all([
+    input.characterId ? prisma.character.findUnique({ where: { id: input.characterId }, select: { id: true } }) : null,
+    input.commentId ? prisma.comment.findUnique({ where: { id: input.commentId }, select: { id: true, characterId: true, postId: true } }) : null,
+    input.postId ? prisma.post.findFirst({ where: { id: input.postId, status: "PUBLISHED" }, select: { id: true } }) : null,
+  ]);
+  if (input.characterId && !character) throw new NotFoundError("Character not found.");
+  if (input.commentId && !comment) throw new NotFoundError("Comment not found.");
+  if (input.postId && !post) throw new NotFoundError("Post not found.");
+  if (comment && input.characterId && comment.characterId !== input.characterId) {
+    throw new AppError("The comment does not belong to this character.", 422, "INVALID_REPORT_TARGET");
+  }
+  if (comment && input.postId && comment.postId !== input.postId) {
+    throw new AppError("The comment does not belong to this post.", 422, "INVALID_REPORT_TARGET");
+  }
 
   return prisma.report.create({
     data: {
       userId: user.id,
       characterId: input.characterId,
       commentId: input.commentId,
+      postId: input.postId,
       reason: input.reason,
       detail: input.detail,
     },

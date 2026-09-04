@@ -21,6 +21,12 @@ services:
         generateValue: true
       - key: MARKET_QUOTE_SECRET
         generateValue: true
+      - key: FEATURE_COMMUNITY
+        value: "true"
+      - key: FEATURE_PREDICTIONS
+        value: "true"
+      - key: FEATURE_SUBMISSIONS
+        value: "true"
       - key: NEXTAUTH_URL
         sync: false
       - key: AUTH_TRUST_HOST
@@ -49,6 +55,8 @@ services:
         sync: false
       - key: S3_PUBLIC_BASE_URL
         value: ""
+      - key: S3_FORCE_PATH_STYLE
+        value: "false"
       - key: DEMO_MODE
         value: "false"
       - key: DEMO_ADMIN_ENABLED

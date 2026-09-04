@@ -62,6 +62,194 @@ const comfortContentZhHant: Record<string, [string, string]> = {
   "comfort-shiori-stress-wallpaper": ["檔案館呼吸壁紙", "配合緩慢呼吸設計的原創漸層壁紙，讓安慰室與玩家房間更平靜。"],
 };
 
+const v3Topics = [
+  { id: "topic-season-watch", slug: "season-watch", en: ["Season watch", "Weekly premieres, impressions, and small discoveries."], zh: ["本季追番", "每週新番、觀後感與剛剛遇見的小發現。"] },
+  { id: "topic-outfit-notes", slug: "outfit-notes", en: ["Outfit notes", "Character looks, palettes, and wardrobe details worth saving."], zh: ["角色衣裝簿", "值得收藏的角色造型、配色與服裝細節。"] },
+  { id: "topic-comfort-corner", slug: "comfort-corner", en: ["Comfort corner", "Gentle character moments for slower evenings."], zh: ["安慰角落", "留給慢一點的夜晚與角色陪伴。"] },
+  { id: "topic-prediction-desk", slug: "prediction-desk", en: ["Prediction desk", "Source-led questions about upcoming ACG news."], zh: ["季番預測桌", "用公開來源一起觀察下一則 ACG 消息。"] },
+] as const;
+
+async function seedV3Experience(db: SeedClient, snapshot: SeedSnapshot) {
+  const viewerId = snapshot.users[0]?.id;
+  if (!viewerId) return;
+
+  for (const topic of v3Topics) {
+    await db.topic.upsert({
+      where: { slug: topic.slug },
+      create: { id: topic.id, slug: topic.slug, title: topic.en[0], description: topic.en[1], featured: true },
+      update: { title: topic.en[0], description: topic.en[1], featured: true },
+    });
+    for (const [locale, copy] of [["EN", topic.en], ["ZH_HANT", topic.zh]] as const) {
+      await db.topicLocale.upsert({
+        where: { topicId_locale: { topicId: topic.id, locale } },
+        create: { topicId: topic.id, locale, title: copy[0], description: copy[1] },
+        update: { title: copy[0], description: copy[1] },
+      });
+    }
+  }
+
+  await db.creatorProfile.upsert({
+    where: { userId: viewerId },
+    create: { userId: viewerId, tagline: "Character notes, quiet rooms, and seasonal signals.", approvedPostCount: 3, probationComplete: true },
+    update: { approvedPostCount: 3, probationComplete: true },
+  });
+  await db.creatorProfile.upsert({
+    where: { userId: "community-seed-001" },
+    create: { userId: "community-seed-001", tagline: "The ACG Exchange editorial desk.", approvedPostCount: 12, probationComplete: true },
+    update: { approvedPostCount: 12, probationComplete: true },
+  });
+
+  const seededPosts = [
+    { id: "post-v3-akari-night", slug: "akari-night-support-look", characterId: "char-akari", assetId: "asset-akari-night-support", topicId: "topic-outfit-notes", kind: "OUTFIT" as const, title: "A midnight support look for Akari", body: "Warm stage light, a quieter jacket, and the kind of smile that makes the walk home feel shorter.", language: "EN" as const },
+    { id: "post-v3-kurumi-clock", slug: "kurumi-clockwork-gallery-note", characterId: "char-kurumi", assetId: "asset-tokisaki-kurumi-primary", topicId: "topic-outfit-notes", kind: "NOTE" as const, title: "Clockwork details worth opening twice", body: "A source-linked gallery note collecting the red, black, and antique-clock motifs around Kurumi's signal page.", language: "EN" as const },
+    { id: "post-v3-frieren-evening", slug: "frieren-slow-evening-note", characterId: "char-frieren", assetId: "asset-frieren-primary", topicId: "topic-comfort-corner", kind: "GUIDE" as const, title: "給步調很慢的夜晚", body: "不需要立刻完成所有事。先把今天收進書頁，再替明天留下一小格空白。", language: "ZH_HANT" as const },
+    { id: "post-v3-bocchi-practice", slug: "bocchi-small-practice-win", characterId: "char-hitori-gotoh", assetId: "asset-hitori-gotoh-primary", topicId: "topic-comfort-corner", kind: "COMIC" as const, title: "今天只練完八小節，也算完成", body: "把巨大目標剪成一張便條紙。完成以後，回來替自己按一顆小小的心。", language: "ZH_HANT" as const },
+    { id: "post-v3-summer-desk", slug: "summer-2026-weekly-watchdesk", characterId: "char-motoko-kusanagi", assetId: "asset-motoko-kusanagi-primary", topicId: "topic-season-watch", kind: "PREDICTION_TAKE" as const, title: "Summer watchdesk: three signals to follow", body: "Broadcast dates, official announcements, and catalog movement gathered into one calm weekly desk.", language: "EN" as const },
+    { id: "post-v3-tohka-snack", slug: "tohka-after-school-note", characterId: "char-tohka", assetId: "asset-yatogami-tohka-primary", topicId: "topic-season-watch", kind: "NOTE" as const, title: "十香的放學後補給時間", body: "今天的應援手帳只記一件事：好好吃飯，也是一種替明天充電的方法。", language: "ZH_HANT" as const },
+  ];
+
+  for (const [index, post] of seededPosts.entries()) {
+    await db.post.upsert({
+      where: { slug: post.slug },
+      create: { id: post.id, authorId: index % 2 === 0 ? viewerId : "community-seed-001", slug: post.slug, language: post.language, kind: post.kind, status: "PUBLISHED", title: post.title, body: post.body, primaryCharacterId: post.characterId, publishedAt: new Date(Date.UTC(2026, 7, 27 + index, 10 + index, 0, 0)), viewCount: 48 + index * 17 },
+      update: { title: post.title, body: post.body, status: "PUBLISHED", primaryCharacterId: post.characterId },
+    });
+    await db.postMedia.upsert({
+      where: { id: `${post.id}-media` },
+      create: { id: `${post.id}-media`, postId: post.id, assetId: post.assetId, altText: `${post.title} character visual`, status: "APPROVED", sortOrder: 0, reviewedAt: new Date("2026-08-30T08:00:00.000Z"), reviewedById: viewerId },
+      update: { assetId: post.assetId, altText: `${post.title} character visual`, status: "APPROVED" },
+    });
+    await db.postTopic.upsert({
+      where: { postId_topicId: { postId: post.id, topicId: post.topicId } },
+      create: { postId: post.id, topicId: post.topicId },
+      update: {},
+    });
+  }
+
+  const seededReactions = [
+    [viewerId, "post-v3-kurumi-clock", "HEART"],
+    [viewerId, "post-v3-bocchi-practice", "HEART"],
+    [viewerId, "post-v3-tohka-snack", "CHEER"],
+    ["community-seed-001", "post-v3-akari-night", "HEART"],
+    ["community-seed-001", "post-v3-frieren-evening", "HEART"],
+    ["community-seed-001", "post-v3-summer-desk", "CHEER"],
+  ] as const;
+  for (const [userId, postId, kind] of seededReactions) {
+    await db.postReaction.upsert({
+      where: { userId_postId_kind: { userId, postId, kind } },
+      create: { userId, postId, kind },
+      update: {},
+    });
+  }
+
+  const seededPostComments = [
+    { id: "comment-v3-akari-night", userId: viewerId, postId: "post-v3-akari-night", content: "The warmer palette really suits this quieter stage mood." },
+    { id: "comment-v3-frieren-evening", userId: "community-seed-001", postId: "post-v3-frieren-evening", content: "今晚就先完成一小格，明天再慢慢繼續。" },
+    { id: "comment-v3-tohka-snack", userId: viewerId, postId: "post-v3-tohka-snack", content: "十香的補給提醒已經收進今晚的收藏櫃。" },
+  ];
+  for (const comment of seededPostComments) {
+    await db.comment.upsert({
+      where: { id: comment.id },
+      create: { ...comment, status: "VISIBLE" },
+      update: { content: comment.content, status: "VISIBLE" },
+    });
+  }
+
+  await db.userFollow.upsert({
+    where: { followerId_targetId: { followerId: viewerId, targetId: "community-seed-001" } },
+    create: { followerId: viewerId, targetId: "community-seed-001" },
+    update: {},
+  });
+
+  await db.postSave.upsert({
+    where: { userId_postId: { userId: viewerId, postId: "post-v3-frieren-evening" } },
+    create: { userId: viewerId, postId: "post-v3-frieren-evening" },
+    update: {},
+  });
+  for (const characterId of ["char-akari", "char-frieren", "char-hitori-gotoh"]) {
+    await db.characterFollow.upsert({
+      where: { userId_characterId: { userId: viewerId, characterId } },
+      create: { userId: viewerId, characterId },
+      update: {},
+    });
+  }
+  await db.topicFollow.upsert({
+    where: { userId_topicId: { userId: viewerId, topicId: "topic-season-watch" } },
+    create: { userId: viewerId, topicId: "topic-season-watch" },
+    update: {},
+  });
+
+  const collection = await db.collection.upsert({
+    where: { slug: "kyoaka-evening-shelf" },
+    create: { id: "collection-v3-evening", userId: viewerId, slug: "kyoaka-evening-shelf", title: "Evening shelf", description: "Comfort notes and looks to revisit after a long day." },
+    update: { title: "Evening shelf", description: "Comfort notes and looks to revisit after a long day." },
+  });
+  await db.collectionItem.upsert({
+    where: { id: "collection-item-v3-frieren" },
+    create: { id: "collection-item-v3-frieren", collectionId: collection.id, postId: "post-v3-frieren-evening", sortOrder: 0 },
+    update: { collectionId: collection.id, postId: "post-v3-frieren-evening", characterId: null, assetId: null },
+  });
+
+  const featuredSeries = await db.series.findMany({ take: 6, orderBy: { title: "asc" } });
+  for (const [index, series] of featuredSeries.entries()) {
+    const episode = await db.episode.upsert({
+      where: { seriesId_number: { seriesId: series.id, number: 1 } },
+      create: { seriesId: series.id, number: 1, title: "Episode 1", airAt: new Date(Date.UTC(2026, 8, 5 + index, 13, 0, 0)), sourceUrl: series.bangumiUrl },
+      update: { airAt: new Date(Date.UTC(2026, 8, 5 + index, 13, 0, 0)) },
+    });
+    await db.episodeLocale.upsert({
+      where: { episodeId_locale: { episodeId: episode.id, locale: "ZH_HANT" } },
+      create: { episodeId: episode.id, locale: "ZH_HANT", title: "第 1 話" },
+      update: { title: "第 1 話" },
+    });
+  }
+  if (featuredSeries[0]) {
+    await db.libraryEntry.upsert({
+      where: { userId_seriesId: { userId: viewerId, seriesId: featuredSeries[0].id } },
+      create: { userId: viewerId, seriesId: featuredSeries[0].id, status: "WATCHING" },
+      update: { status: "WATCHING" },
+    });
+  }
+
+  const predictionEvents = [
+    { id: "prediction-event-summer-2026", slug: "summer-2026-watchdesk", category: "SEASON", en: ["Summer 2026 watchdesk", "Objective signals around the current anime season."], zh: ["2026 夏季觀測桌", "一起追蹤本季動畫的公開消息與資料訊號。"] },
+    { id: "prediction-event-announcements", slug: "acg-announcement-watch", category: "ANNOUNCEMENT", en: ["Announcement watch", "Source-led questions about upcoming official ACG news."], zh: ["作品情報觀測", "以公開來源追蹤即將到來的作品消息。"] },
+  ] as const;
+  for (const event of predictionEvents) {
+    await db.predictionEvent.upsert({ where: { slug: event.slug }, create: { id: event.id, slug: event.slug, category: event.category, title: event.en[0], description: event.en[1], featured: true }, update: { title: event.en[0], description: event.en[1], featured: true } });
+    for (const [locale, copy] of [["EN", event.en], ["ZH_HANT", event.zh]] as const) {
+      await db.predictionEventLocale.upsert({ where: { eventId_locale: { eventId: event.id, locale } }, create: { eventId: event.id, locale, title: copy[0], description: copy[1] }, update: { title: copy[0], description: copy[1] } });
+    }
+  }
+
+  const predictionMarkets = [
+    { id: "prediction-market-frieren-news", eventId: "prediction-event-announcements", slug: "frieren-official-news-before-2027", en: ["Will Frieren receive a new official animation update before 2027?", "Resolve Yes only if an official production account or website publishes a new animation project update before the deadline."], zh: ["《葬送的芙莉蓮》會在 2027 年前公布新的動畫消息嗎？", "只有官方製作帳號或網站在截止前發布新的動畫企劃消息，才結算為 Yes。"], source: "https://frieren-anime.jp/", sourceLabel: "Official Frieren anime site", closesAt: "2026-12-31T14:00:00.000Z" },
+    { id: "prediction-market-dal-news", eventId: "prediction-event-announcements", slug: "date-a-live-animation-update-q1-2027", en: ["Will Date A Live publish a new animation update by March 2027?", "Resolve from the official Date A Live website or verified production account."], zh: ["《約會大作戰》會在 2027 年 3 月前發布新的動畫消息嗎？", "以《約會大作戰》官方網站或經驗證的製作帳號為結算來源。"], source: "https://date-a-live5th-anime.com/", sourceLabel: "Official Date A Live site", closesAt: "2027-03-31T14:00:00.000Z" },
+    { id: "prediction-market-bangumi-threshold", eventId: "prediction-event-summer-2026", slug: "summer-title-bangumi-collection-threshold", en: ["Will the featured summer title reach the published Bangumi collection threshold?", "Resolve using the captured Bangumi subject total at 23:00 Hong Kong time on the deadline."], zh: ["本季焦點作品會達到指定的 Bangumi 收藏門檻嗎？", "以截止日香港時間 23:00 保存的 Bangumi 條目收藏數快照結算。"], source: "https://bangumi.tv/anime/tag/2026%E5%A4%8F", sourceLabel: "Bangumi 2026 summer index", closesAt: "2026-10-31T15:00:00.000Z" },
+  ] as const;
+  const reservePerMarket = Math.ceil(100 * 20 * Math.log(2));
+  for (const marketData of predictionMarkets) {
+    const market = await db.predictionMarket.upsert({
+      where: { slug: marketData.slug },
+      create: { id: marketData.id, eventId: marketData.eventId, slug: marketData.slug, question: marketData.en[0], description: marketData.en[1], status: "OPEN", resolutionSourceUrl: marketData.source, resolutionSourceLabel: marketData.sourceLabel, edgeCaseRules: "If the source is unavailable or the wording cannot be resolved objectively, void and refund the market.", closesAt: new Date(marketData.closesAt), reservedLiability: reservePerMarket },
+      update: { question: marketData.en[0], description: marketData.en[1], resolutionSourceUrl: marketData.source, resolutionSourceLabel: marketData.sourceLabel, closesAt: new Date(marketData.closesAt), reservedLiability: reservePerMarket },
+    });
+    for (const [locale, copy, edgeCaseRules] of [["EN", marketData.en, "If the source is unavailable or the wording cannot be resolved objectively, void and refund the market."], ["ZH_HANT", marketData.zh, "若來源無法存取或問題不能客觀判定，市場作廢並退款。"]] as const) {
+      await db.predictionMarketLocale.upsert({ where: { marketId_locale: { marketId: market.id, locale } }, create: { marketId: market.id, locale, question: copy[0], description: copy[1], edgeCaseRules }, update: { question: copy[0], description: copy[1], edgeCaseRules } });
+    }
+    for (const [key, label] of [["YES", "Yes"], ["NO", "No"]] as const) {
+      await db.predictionOutcome.upsert({ where: { marketId_key: { marketId: market.id, key } }, create: { marketId: market.id, key, label }, update: { label } });
+    }
+    await db.oracleSource.upsert({ where: { id: `${market.id}-oracle` }, create: { id: `${market.id}-oracle`, marketId: market.id, label: marketData.sourceLabel, url: marketData.source, priority: 1 }, update: { label: marketData.sourceLabel, url: marketData.source } });
+    await db.predictionRuleVersion.upsert({ where: { marketId_version: { marketId: market.id, version: 1 } }, create: { marketId: market.id, version: 1, snapshot: { question: marketData.en[0], source: marketData.source, closesAt: marketData.closesAt } }, update: {} });
+  }
+  await db.predictionTreasury.upsert({
+    where: { id: "system" },
+    create: { id: "system", balance: 50_000, reserved: predictionMarkets.length * reservePerMarket },
+    update: { balance: 50_000, reserved: predictionMarkets.length * reservePerMarket },
+  });
+}
+
 export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapshot = seedSnapshot) {
   for (const user of snapshot.users) {
     await db.user.upsert({
@@ -769,4 +957,6 @@ export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapsh
       await db.campaignContribution.upsert({ where: { campaignId_userId: { campaignId: campaign.id, userId: "community-seed-001" } }, create: { campaignId: campaign.id, userId: "community-seed-001", units: character.circulatingUnits, badgeLevel: character.circulatingUnits >= 25 ? 2 : 1, lastContributedAt: new Date("2026-08-13T08:00:00.000Z") }, update: { units: character.circulatingUnits, badgeLevel: character.circulatingUnits >= 25 ? 2 : 1, lastContributedAt: new Date("2026-08-13T08:00:00.000Z") } });
     }
   }
+
+  await seedV3Experience(db, snapshot);
 }

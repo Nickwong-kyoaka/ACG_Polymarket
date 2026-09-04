@@ -10,8 +10,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   if (!isPublicLocale(locale)) return {};
   return {
-    title: { default: locale === "zh-Hant" ? "ACG Exchange｜角色應援交易所" : "ACG Exchange | Character Support Signals", template: `%s | ACG Exchange` },
-    description: locale === "zh-Hant" ? "把喜歡變成可收藏的應援訊號：角色市場、每日 SUP、安慰室與原創外觀。" : "Turn affection into collectible support signals through a positive-only character exchange, daily SUP, comfort rooms, and original cosmetics.",
+    title: { default: locale === "zh-Hant" ? "ACG Exchange｜角色手帳與季番預測" : "ACG Exchange | Fandom and Season Predictions", template: `%s | ACG Exchange` },
+    description: locale === "zh-Hant" ? "收藏角色、交換應援訊號、追蹤新番，也用有來源的問題記下你對下一則消息的判斷。" : "Collect character stories, exchange support signals, follow the season, and record source-led predictions about what comes next.",
     alternates: { languages: { en: "/en", "zh-Hant": "/zh-Hant" } },
   };
 }

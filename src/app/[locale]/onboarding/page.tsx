@@ -1,18 +1,117 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Coins, HeartHandshake, LogIn, Sparkles } from "lucide-react";
 import { notFound } from "next/navigation";
-import { isPublicLocale, localePath, pick } from "@/components/acg-locale";
-import { SectionHeading } from "@/components/ui/section-heading";
+import { ArrowRight, BookOpen, Heart, Ticket } from "lucide-react";
+import { AuthEntry } from "@/components/auth-entry";
+import { isPublicLocale, localePath, type PublicLocale } from "@/components/acg-locale";
+import { OnboardingPicker, type OnboardingCharacter } from "@/components/onboarding-picker";
+import { getAuthAvailability, auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-export default async function OnboardingPage({ params }: { params: Promise<{ locale: string }> }) {
-  const { locale: rawLocale } = await params;
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const zh = locale === "zh-Hant";
+  return {
+    title: zh ? "打開你的角色房間" : "Open your character room",
+    description: zh ? "登入後挑選喜歡的作品、話題與角色，整理屬於你的 ACG Exchange。" : "Sign in, pick your interests and characters, and arrange an ACG Exchange room of your own.",
+    robots: { index: false, follow: false },
+  };
+}
+
+function safeNextPath(value: string | string[] | undefined, locale: PublicLocale) {
+  const path = Array.isArray(value) ? value[0] : value;
+  if (path?.startsWith("/") && !path.startsWith("//") && !path.startsWith("/api/auth")) return path;
+  return localePath(locale, "/community");
+}
+
+function assetUrl(asset: { publicUrl: string | null; storageKey: string; derivatives: Array<{ kind: string; publicUrl: string }> } | undefined) {
+  if (!asset) return null;
+  const card = asset.derivatives.find((entry) => entry.kind === "CARD") ?? asset.derivatives[0];
+  if (card?.publicUrl) return card.publicUrl;
+  if (asset.publicUrl?.startsWith("https://") || asset.publicUrl?.startsWith("/")) return asset.publicUrl;
+  return asset.storageKey.startsWith("assets/") ? `/${asset.storageKey}` : null;
+}
+
+export default async function OnboardingPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [{ locale: rawLocale }, query, session] = await Promise.all([params, searchParams, auth()]);
   if (!isPublicLocale(rawLocale)) notFound();
   const locale = rawLocale;
-  const steps = [
-    { icon: LogIn, en: "Sign in and open your room", zh: "登入並打開玩家房間", enBody: "Google sign-in creates your profile, private wallet, and a one-time 300 SUP starter ledger entry.", zhBody: "使用 Google 登入後會建立個人資料、私密錢包與一次性的 300 SUP 起始帳本記錄。" },
-    { icon: Coins, en: "Build a gentle daily loop", zh: "建立輕量每日循環", enBody: "Claim 100 SUP each Hong Kong day, complete positive missions, or take one character work shift.", zhBody: "每個香港日簽到領取 100 SUP，完成正向任務，或派遣角色進行一份工作。" },
-    { icon: HeartHandshake, en: "Send your first support", zh: "送出第一份應援", enBody: "Choose a character, preview the system quote, keep a few support units, and add other favorites whenever they find you.", zhBody: "選一名角色、確認系統報價、收藏幾份應援；遇見新的本命時，也隨時可以加進房間。" },
-    { icon: Sparkles, en: "Bring the feeling home", zh: "把喜歡帶回房間", enBody: "Hear a character comfort voice, then open original frames, themes, and wallpapers for your collection shelf.", zhBody: "聽一段角色安慰語音，再為收藏櫃解鎖原創頭像框、主題與壁紙。" },
-  ];
-  return <div className="exchange-page"><section className="exchange-panel bg-[#283338] p-7 text-white sm:p-10 xl:p-12"><p className="exchange-kicker text-[#f0c884] before:bg-[#f0c884]">YOUR FIRST PAGE</p><h1 className="mt-7 exchange-title text-white">{pick(locale, "Open a room for the characters you keep thinking about.", "替那些總會想起的角色，打開一間自己的房間。")}</h1><p className="mt-6 max-w-2xl text-base leading-8 text-white/68">{pick(locale, "Sign in, pick one favorite, and watch the room become yours through small daily rituals, voices, and keepsakes.", "登入、選一名本命，再用每日小事、角色聲音與收藏，慢慢把這裡變成自己的房間。")}</p></section><section className="grid gap-7"><SectionHeading eyebrow="FOUR SMALL STEPS" title={pick(locale, "From sign-in to a room that feels like yours", "從登入到一間真正像你的房間")} description={pick(locale, "Each small step adds something visible to your shelf, notebook, or daily routine.", "每個小步驟，都會替收藏櫃、應援手帳或每日習慣添上一點東西。")}/><div className="grid gap-5 md:grid-cols-2">{steps.map(({ icon: Icon, en, zh, enBody, zhBody }, index) => <article key={en} className="exchange-panel p-6"><div className="flex items-center justify-between"><span className="grid h-12 w-12 place-items-center rounded-full bg-[#c85d5a] text-white"><Icon className="h-6 w-6" /></span><span className="font-display text-5xl text-[#e8ddd2]">0{index + 1}</span></div><h2 className="mt-6 font-display text-3xl">{pick(locale, en, zh)}</h2><p className="mt-4 text-sm leading-7 text-slate-600">{pick(locale, enBody, zhBody)}</p></article>)}</div><div className="flex flex-wrap gap-3"><Link href="/api/auth/signin" className="exchange-button-primary">{pick(locale, "Open sign in", "打開登入頁")}<ArrowRight className="h-4 w-4" /></Link><Link href={localePath(locale, "/market")} className="exchange-button-secondary">{pick(locale, "Browse as a guest", "先以訪客逛逛")}</Link></div></section></div>;
+  const zh = locale === "zh-Hant";
+  const nextPath = safeNextPath(query.next ?? query.callbackUrl, locale);
+  const availability = getAuthAvailability();
+
+  const [characters, viewerState] = session?.user?.id ? await Promise.all([
+    prisma.character.findMany({
+      where: { publishStatus: "PUBLISHED" },
+      orderBy: [{ isFeatured: "desc" }, { supporterCount: "desc" }],
+      take: 12,
+      select: {
+        id: true, slug: true, name: true, title: true, accentFrom: true, accentTo: true,
+        locales: { select: { locale: true, name: true, title: true } },
+        assets: {
+          where: { workflowStatus: "PUBLISHED", contentRating: "SFW", permissionStatus: { notIn: ["REJECTED", "TAKEDOWN_REQUESTED"] } },
+          orderBy: [{ primaryPriority: "desc" }, { publishedAt: "desc" }],
+          take: 1,
+          select: { publicUrl: true, storageKey: true, altText: true, locales: { select: { locale: true, altText: true } }, derivatives: { select: { kind: true, publicUrl: true } } },
+        },
+      },
+    }),
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { profile: { select: { favoriteTags: true, onboardingCompletedAt: true } }, characterFollows: { select: { characterId: true } } },
+    }),
+  ]) : [[], null];
+
+  const localeCode = locale === "zh-Hant" ? "ZH_HANT" : "EN";
+  const choices: OnboardingCharacter[] = characters.map((character) => {
+    const localized = character.locales.find((entry) => entry.locale === localeCode);
+    const visual = character.assets[0];
+    const visualLocale = visual?.locales.find((entry) => entry.locale === localeCode);
+    return {
+      id: character.id,
+      slug: character.slug,
+      name: localized?.name ?? character.name,
+      title: localized?.title ?? character.title,
+      imageUrl: assetUrl(visual),
+      altText: visualLocale?.altText ?? visual?.altText ?? `${localized?.name ?? character.name} character visual`,
+      accentFrom: character.accentFrom,
+      accentTo: character.accentTo,
+    };
+  });
+
+  return (
+    <div className="onboarding-page">
+      <section className="onboarding-cover">
+        <div className="onboarding-cover-copy">
+          <span className="onboarding-edition">WELCOME BOOK · 01</span>
+          <p className="onboarding-kicker">{zh ? "角色、作品與你的小房間" : "CHARACTERS, STORIES, YOUR LITTLE ROOM"}</p>
+          <h1>{zh ? "先從最近讓你心動的事開始。" : "Begin with whatever has your heart lately."}</h1>
+          <p>{zh ? "挑幾個話題與角色，我們會把社群手帳、季番消息和應援訊號整理到你最容易看見的位置。" : "Pick a few topics and characters. We will arrange clubroom notes, seasonal news, and support signals where you can find them easily."}</p>
+          <div className="onboarding-cover-details"><span><BookOpen />{zh ? "雙語角色手帳" : "Bilingual character notes"}</span><span><Heart />{zh ? "依喜好整理" : "Arranged around you"}</span><span><Ticket />{zh ? "300 SUP 入場票" : "300 SUP welcome ticket"}</span></div>
+        </div>
+        <div className="onboarding-cover-art" aria-hidden="true"><span>推</span><i>ACG<br />EXCHANGE</i><b>YOUR<br />FIRST<br />ISSUE</b></div>
+      </section>
+
+      {session?.user?.id ? (
+        <>
+          <div className="onboarding-welcome"><div><span>{zh ? "已登入" : "SIGNED IN"}</span><strong>{session.user.name ?? session.user.email ?? (zh ? "應援者" : "Supporter")}</strong></div>{viewerState?.profile?.onboardingCompletedAt ? <Link href={localePath(locale, "/community")}>{zh ? "直接回社群" : "Back to the clubroom"}<ArrowRight /></Link> : null}</div>
+          <OnboardingPicker locale={locale} characters={choices} initialTags={viewerState?.profile?.favoriteTags ?? []} initialCharacterIds={viewerState?.characterFollows.map((follow) => follow.characterId) ?? []} nextPath={nextPath} />
+        </>
+      ) : (
+        <section className="onboarding-signin-sheet">
+          <div><span>01 / SIGN IN</span><h2>{zh ? "把這本手帳變成你的。" : "Make this notebook yours."}</h2><p>{zh ? "登入後才會保存關注、收藏與 SUP。你的錢包和應援紀錄預設只在自己的房間裡。" : "Sign in to keep follows, saves, and SUP. Your wallet and support records stay in your own room by default."}</p></div>
+          <AuthEntry locale={locale} googleEnabled={availability.google} demoEnabled={availability.demo} redirectTo={`${localePath(locale, "/onboarding")}?step=interests&next=${encodeURIComponent(nextPath)}`} />
+          <Link href={localePath(locale, "/community")} className="onboarding-guest-link">{zh ? "先以訪客逛社群" : "Browse the clubroom as a guest"}<ArrowRight /></Link>
+        </section>
+      )}
+    </div>
+  );
 }

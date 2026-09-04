@@ -1,177 +1,147 @@
-# ACG Support Market
+# ACG Exchange
 
-A web-first **character support market** built with `Next.js`, `TypeScript`, `Tailwind`, `Prisma`, and `NextAuth`.
+ACG Exchange combines a bilingual character catalog, community notes, support signals, seasonal tracking, comfort content, and an earned-SUP prediction desk in one Next.js application.
 
-This MVP is intentionally **positive-only**:
+Character support and event predictions are deliberately separate:
 
-- users buy and sell back support units against a system pool
-- there is no shorting, no player-to-player order book, and no cash-out
-- Bangumi-compatible metadata and `CC BY-SA` text must preserve attribution
-- official art, voice, manga pages, and logos are not assumed reusable by default
+- Character pages quote `SUP / support unit`, a signal of community affection.
+- Prediction pages quote `YES / NO` probabilities using a binary LMSR market maker.
+- SUP is earned inside the site. It cannot be purchased, transferred, withdrawn, or exchanged for cash.
 
 ## Stack
 
-- `Next.js 16` App Router
-- `TypeScript`
-- `Tailwind CSS 4`
-- `Prisma 7`
-- `NextAuth`
-- `Vitest`
-- `PostgreSQL` via `docker-compose`
+- Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4
+- Prisma 7 and PostgreSQL
+- Auth.js / NextAuth with Google OAuth and a development-only demo provider
+- S3-compatible media storage with source and moderation records
+- Vitest, Docker Compose, Render, and Neon
 
-## Main surfaces
+## Product surfaces
 
-- `/` landing + featured characters
-- `/market` browse and filter characters
-- `/character/[slug]` character detail, attribute table, buy/sell, comments, reactions
-- `/comfort` and `/comfort/[mode]` healing fandom rooms with sweet-talk, ASMR placeholders, and comic panels
-- `/u/[handle]` public profile
-- `/me` portfolio, rewards, cosmetics
-- `/onboarding` sign-in and product intro
-- `/help/market-rules` trust and rights policy
-- `/admin` official-only publishing and Bangumi-aware import tools
-- `/admin/content`, `/admin/imports`, `/admin/assets`, `/admin/shop` beta content operations
+- `/en` and `/zh-Hant`: editorial lobby, personalized notes, broadcast calendar, support signals, campaigns, and predictions
+- `/community`, `/posts/[slug]`, `/create`: visual support notes, topics, follows, saves, replies, and hybrid moderation
+- `/market`, `/character/[slug]`: character support quotes, signed trades, history, campaigns, gallery, and discussions
+- `/predictions`, `/predictions/[slug]`, `/me/predictions`: source-led LMSR markets, signed quotes, position book, challenges, and resolution history
+- `/comfort`, `/shop`, `/work`: comfort stories and voices, unlockable cosmetics, missions, and timed work rewards
+- `/me`, `/me/notifications`: private player room, library, holdings, notifications, preferences, and public-profile controls
+- `/admin`: content, media, community, knowledge revisions, predictions, campaigns, takedowns, and reconciliation
 
-## Local setup with Docker
+The seed catalog contains 24 published characters plus bilingual social notes, topics, episodes, prediction events, and coherent market history. Seed and bootstrap are explicit deployment operations; public requests never seed the database.
 
-This path runs both the Next.js app and PostgreSQL in Docker.
+## Local Docker setup
 
-1. Build and start the stack:
+Run the complete development stack:
 
 ```bash
 docker compose up --build
 ```
 
-2. Open the app:
+Open:
 
 ```text
-http://localhost:3000
-http://localhost:3000/?lang=cn
-http://localhost:3000/market?lang=cn
-http://localhost:3000/comfort
-http://localhost:3000/me
+http://localhost:3000/en
+http://localhost:3000/zh-Hant
+http://localhost:3000/en/community
+http://localhost:3000/en/predictions
+http://localhost:3000/en/me
 ```
 
-3. Stop the stack:
-
-```bash
-docker compose down
-```
-
-4. Reset the local Docker database when you want a clean seed:
+The Compose profile enables the demo sign-in only in local development. To reset the local database:
 
 ```bash
 docker compose down -v
 docker compose up --build
 ```
 
-The Docker app service runs `prisma generate`, applies committed migrations, seeds the idempotent demo data, then starts `next dev` on `0.0.0.0:3000`. Demo login and demo admin access are enabled only by this local Compose configuration.
-
-## Local setup without Docker app
-
-1. Install dependencies:
+## Local setup without the app container
 
 ```bash
 npm install
-```
-
-2. Copy env file:
-
-```bash
-cp .env.example .env
-```
-
-3. Start only local Postgres:
-
-```bash
 docker compose up -d postgres
-```
-
-4. Generate Prisma client:
-
-```bash
 npm run prisma:generate
-```
-
-5. Apply committed migrations and seed the database:
-
-```bash
 npx prisma migrate deploy
-npm run db:seed
-```
-
-6. Start the app:
-
-```bash
+npm run db:bootstrap
 npm run dev
 ```
 
-## Scripts
-
-- `npm run dev`
-- `npm run build`
-- `npm run lint`
-- `npm run typecheck`
-- `npm run test`
-- `npm run prisma:generate`
-- `npm run db:push`
-- `npm run db:seed`
-
-## Notes on auth
-
-- Google and email providers are ready once env vars are filled.
-- A demo credentials provider is included so local development works immediately.
-- `.env.example` and Render default `DEMO_MODE` and `DEMO_ADMIN_ENABLED` to `false`. Enable them only in a private local environment.
-- Google login requires `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`. Add `https://YOUR-SERVICE.onrender.com/api/auth/callback/google` as an authorized redirect URI in Google Cloud.
-
-## Notes on persistence
-
-- The repository includes a full Prisma schema for the target production model.
-- Runtime market, reward, shop, watchlist, comment, reaction, and comfort flows are backed by Prisma/Postgres.
-- Production builds never push schema changes or seed data.
-- Render applies committed Prisma migrations before starting Next.js. The deployment bootstrap seeds only an empty database; later restarts preserve user data and only synchronize approved media metadata.
+Copy `.env.example` to `.env` first. The default local PostgreSQL connection is already documented there.
 
 ## Render deployment
 
-This repo includes `render.yaml` for a Render Node web service on `main`, following Render's full Next.js web-service path instead of a static export.
+The repository includes a `render.yaml` Blueprint configured for `main`, Singapore, automatic deploys after passing checks, database migrations, idempotent bootstrap, and `/api/health`.
 
-1. Connect the GitHub repo to Render as a Blueprint.
-2. Use a Neon or other durable Postgres URL for `DATABASE_URL`; Render free Postgres expires after 30 days and is best kept for temporary tests.
-3. Set `NEXTAUTH_URL` to the full Render URL or custom domain, such as `https://acg-polymarket.onrender.com`.
-4. Populate `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `ADMIN_EMAILS`. Render generates `AUTH_SECRET` and `NEXTAUTH_SECRET` from the Blueprint.
-5. Keep `DEMO_MODE=false`, `DEMO_ADMIN_ENABLED=false`, and `ADS_PROVIDER=mock` for the first public deployment.
-6. Fill the `S3_*` values only when durable asset storage is connected. Render's local filesystem is ephemeral.
+1. Create a Neon PostgreSQL project and copy its pooled `postgresql://...` connection string.
+2. In Render, choose **New > Blueprint**, connect `Nickwong-kyoaka/ACG_Polymarket`, and select `main`.
+3. Enter the values marked `sync: false`. Values marked `generateValue: true` are generated by Render automatically.
+4. After Render assigns the final service URL, set `NEXTAUTH_URL` to that exact HTTPS origin with no trailing slash.
+5. In Google Cloud, add `https://YOUR-SERVICE.onrender.com/api/auth/callback/google` as an authorized redirect URI.
+6. Deploy, then confirm `/api/health`, `/en`, `/zh-Hant`, Google sign-in, and the admin email.
 
-Render uses these lifecycle commands:
+Required production variables:
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | Neon pooled PostgreSQL connection string with SSL |
+| `AUTH_SECRET` | Render-generated long random secret |
+| `NEXTAUTH_SECRET` | Render-generated long random secret |
+| `MARKET_QUOTE_SECRET` | Separate Render-generated random secret for signed quotes |
+| `NEXTAUTH_URL` | Final Render HTTPS origin |
+| `AUTH_TRUST_HOST` | `true` |
+| `AUTH_GOOGLE_ID` | Google OAuth client ID |
+| `AUTH_GOOGLE_SECRET` | Google OAuth client secret |
+| `ADMIN_EMAILS` | Comma-separated admin Google email addresses |
+
+Safe launch values:
+
+| Variable | Value |
+| --- | --- |
+| `FEATURE_COMMUNITY` | `true` |
+| `FEATURE_PREDICTIONS` | `true` |
+| `FEATURE_SUBMISSIONS` | `true`; switch to `false` if the review queue must pause |
+| `ADS_PROVIDER` | `mock` until the real site and assets are approved |
+| `DEMO_MODE` | `false` |
+| `DEMO_ADMIN_ENABLED` | `false` |
+| `ALLOW_BETA_RESET` | `false` |
+
+Optional media variables:
+
+`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PUBLIC_BASE_URL`, and `S3_FORCE_PATH_STYLE` are required only for durable uploads. Render's local filesystem is ephemeral, so public external media should use S3-compatible storage before launch.
+
+Render lifecycle:
 
 ```text
 Build: npm ci && npm run prisma:generate && npm run build
 Start: npx prisma migrate deploy && npm run db:bootstrap && npm run start -- -H 0.0.0.0 -p $PORT
-Initial deploy hook: npm run db:bootstrap
-Health check: /api/health
+Health: /api/health
 ```
 
-The health endpoint performs a lightweight `SELECT 1`, returns `200` only when PostgreSQL is reachable, and returns `503` without exposing database errors otherwise. `db:bootstrap` checks for existing characters before seeding, so manual Docker services and Blueprint services can share the same safe startup path without resetting an initialized database.
+## Market integrity
 
-## Content policy
+- Character support trades and prediction trades use 30-second signed quote tokens and `Idempotency-Key` headers.
+- Balance, positions, supply, treasury reserves, and ledger entries update in serializable transactions.
+- Prediction markets use binary LMSR with `b=20`, a 100 SUP winning payout, a 2% fee with a 1 SUP minimum, and configured per-order, per-position, and Hong Kong day limits.
+- Resolution follows `DRAFT -> OPEN -> LOCKED -> PROPOSED -> CHALLENGE -> RESOLVED/VOID`; disputed outcomes require another reviewer or a void refund.
+- Database constraints and reconciliation tools protect non-negative balances and internally consistent market totals.
 
-- Bangumi may be used for metadata, tags, relations, and attributed `CC BY-SA` text.
-- Imported text must keep source URL, license, and attribution markers.
-- Assets cannot be published as `PUBLISHED` without a linked rights grant.
+## Community and source policy
+
+- A member's first three posts enter review. Trusted members may publish text and previously approved assets directly.
+- Every new upload or external image still enters source, MIME, size, SFW, and human review.
+- Bangumi imports preserve the raw snapshot, hash, source URL, attribution, and review diff before revision approval.
+- Public media DTOs expose only display-safe source data. Private evidence, contacts, and internal rights records remain admin-only.
+- Media pages with unverified assets use house/mock ad slots.
 
 ## Verification
 
-The current repo passes:
+```bash
+npx prisma validate
+npx prisma migrate status
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm audit --omit=dev
+docker build --target production -t acg-exchange .
+```
 
-- `npx prisma validate`
-- `npx prisma migrate deploy`
-- `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code`
-- `npm run lint`
-- `npm run typecheck`
-- `npm run test`
-- `npm run build`
-
-## Git workflow
-
-- active branch: `main`
-- remote backup: [Nickwong-kyoaka/ACG_Polymarket](https://github.com/Nickwong-kyoaka/ACG_Polymarket)
+GitHub: [Nickwong-kyoaka/ACG_Polymarket](https://github.com/Nickwong-kyoaka/ACG_Polymarket)

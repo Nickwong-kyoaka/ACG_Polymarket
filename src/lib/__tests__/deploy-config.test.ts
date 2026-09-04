@@ -46,16 +46,23 @@ describe("Render deployment support", () => {
       "ADS_PROVIDER",
       "GOOGLE_AD_CLIENT",
       "S3_PUBLIC_BASE_URL",
+      "S3_FORCE_PATH_STYLE",
       "DEMO_MODE",
       "DEMO_ADMIN_ENABLED",
       "AUTH_GOOGLE_ID",
       "AUTH_GOOGLE_SECRET",
+      "FEATURE_COMMUNITY",
+      "FEATURE_PREDICTIONS",
+      "FEATURE_SUBMISSIONS",
     ]) {
       expect(envExample).toContain(`${key}=`);
     }
 
     expect(envExample).toContain('DEMO_MODE="false"');
     expect(envExample).toContain('DEMO_ADMIN_ENABLED="false"');
+    expect(envExample).toContain('FEATURE_COMMUNITY="true"');
+    expect(envExample).toContain('FEATURE_PREDICTIONS="true"');
+    expect(envExample).toContain('FEATURE_SUBMISSIONS="true"');
   });
 
   it("runs migrations at runtime and migration smoke tests in CI", () => {

@@ -42,7 +42,12 @@ export type LedgerReferenceType =
   | "WORK_REWARD"
   | "BUY_SUPPORT"
   | "SELL_SUPPORT"
-  | "SHOP_PURCHASE";
+  | "SHOP_PURCHASE"
+  | "PREDICTION_BUY"
+  | "PREDICTION_SELL"
+  | "PREDICTION_FEE"
+  | "PREDICTION_PAYOUT"
+  | "PREDICTION_REFUND";
 export type NotificationType = "SYSTEM" | "REWARD" | "TRADE" | "SOCIAL" | "SHOP";
 export type SourceKind = "MANUAL" | "BANGUMI";
 export type UserRole = "USER" | "ADMIN";
@@ -76,6 +81,8 @@ export interface Profile {
   pinnedCharacterIds: string[];
   equippedFrameAsset?: string;
   equippedThemeAsset?: string;
+  onboardingCompletedAt?: string;
+  preferredLocale?: "EN" | "ZH_HANT";
 }
 
 export interface Wallet {
@@ -276,9 +283,14 @@ export interface WatchlistItem {
 export interface Comment {
   id: string;
   userId: string;
-  characterId: string;
+  characterId?: string | null;
+  postId?: string | null;
+  predictionMarketId?: string | null;
+  parentId?: string | null;
   content: string;
   status?: "VISIBLE" | "HELD" | "REMOVED";
+  pinnedByAuthor?: boolean;
+  heartedByAuthor?: boolean;
   createdAt: string;
 }
 
@@ -295,6 +307,7 @@ export interface Report {
   userId: string;
   characterId?: string;
   commentId?: string;
+  postId?: string;
   reason: string;
   detail?: string;
   status?: "OPEN" | "REVIEWING" | "RESOLVED" | "DISMISSED";
@@ -308,6 +321,9 @@ export interface Notification {
   title: string;
   body: string;
   type: NotificationType;
+  href?: string;
+  locale?: "EN" | "ZH_HANT";
+  metadata?: Record<string, string | number | boolean>;
   readAt?: string;
   createdAt: string;
 }

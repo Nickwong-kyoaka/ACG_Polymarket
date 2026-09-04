@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Database, FileHeart, FlagTriangleRight, Images, ShieldAlert, ShieldCheck, ShoppingBag, Sparkles, UsersRound } from "lucide-react";
+import { ArrowUpRight, BookOpenCheck, Database, FileHeart, FlagTriangleRight, Images, MessagesSquare, RadioTower, ShieldAlert, ShieldCheck, ShoppingBag, Sparkles, UsersRound } from "lucide-react";
 import { AdminModerationQueue } from "@/components/admin/admin-moderation-queue";
 import { Badge } from "@/components/ui/badge";
 import { Surface } from "@/components/ui/surface";
@@ -14,6 +14,9 @@ const quickLinks = [
   { href: "/admin/assets", label: "Register asset", detail: "Rights gate and workflow inventory", icon: Images, color: "bg-[#f0ecff] text-[#5b3ebd]" },
   { href: "/admin/shop", label: "Publish cosmetic", detail: "Frames, themes, and wallpapers", icon: ShoppingBag, color: "bg-[#fff2c5] text-[#9c4300]" },
   { href: "/admin/campaigns", label: "Run campaigns", detail: "Shared goals and milestone rewards", icon: FlagTriangleRight, color: "bg-[#e9f7ff] text-[#1659a9]" },
+  { href: "/admin/community", label: "Review community", detail: "Posts, probation, reports, and trust", icon: MessagesSquare, color: "bg-[#fff0e3] text-[#a34819]" },
+  { href: "/admin/knowledge", label: "Review revisions", detail: "Sources, field changes, and approvals", icon: BookOpenCheck, color: "bg-[#e7f7ef] text-[#176b49]" },
+  { href: "/admin/predictions", label: "Operate predictions", detail: "Events, reserve, resolution, and voids", icon: RadioTower, color: "bg-[#f2edff] text-[#6040a8]" },
   { href: "/admin/takedowns", label: "Protect creators", detail: "Review notices and pull media", icon: ShieldAlert, color: "bg-rose-100 text-rose-700" },
 ] as const;
 

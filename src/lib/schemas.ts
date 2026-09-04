@@ -17,9 +17,15 @@ export const marketAlertSchema = z.object({
 });
 
 export const commentSchema = z.object({
-  characterId: z.string().min(1),
+  characterId: z.string().min(1).optional(),
+  postId: z.string().min(1).optional(),
+  predictionMarketId: z.string().min(1).optional(),
+  parentId: z.string().min(1).optional(),
   content: z.string().trim().min(3).max(280),
-});
+}).refine(
+  (value) => [value.characterId, value.postId, value.predictionMarketId].filter(Boolean).length === 1,
+  { message: "Choose exactly one discussion target." },
+);
 
 export const reactionSchema = z.object({
   characterId: z.string().min(1),
@@ -29,9 +35,13 @@ export const reactionSchema = z.object({
 export const reportSchema = z.object({
   characterId: z.string().optional(),
   commentId: z.string().optional(),
+  postId: z.string().optional(),
   reason: z.string().trim().min(3).max(120),
   detail: z.string().trim().max(500).optional(),
-});
+}).refine(
+  (value) => Boolean(value.characterId || value.commentId || value.postId),
+  { message: "Choose something to report." },
+);
 
 export const watchlistSchema = z.object({
   characterId: z.string().min(1),

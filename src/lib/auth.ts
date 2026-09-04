@@ -10,6 +10,24 @@ import { prisma } from "@/lib/prisma";
 const providers: NextAuthConfig["providers"] = [];
 const demoMode = process.env.NODE_ENV !== "production" && process.env.DEMO_MODE === "true";
 
+export function getAuthAvailability() {
+  return {
+    google: Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET),
+    demo: demoMode,
+  };
+}
+
+function hasConfiguredLocalAuthUrl() {
+  const configuredUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
+  if (!configuredUrl) return false;
+  try {
+    const hostname = new URL(configuredUrl).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
 function adminEmails() {
   return (process.env.ADMIN_EMAILS ?? "")
     .split(",")
@@ -152,7 +170,7 @@ if (demoMode) {
 
 export const authOptions: NextAuthConfig = {
   secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
-  trustHost: process.env.AUTH_TRUST_HOST === "true" || process.env.RENDER === "true" || process.env.NODE_ENV === "development",
+  trustHost: process.env.AUTH_TRUST_HOST === "true" || process.env.RENDER === "true" || process.env.NODE_ENV === "development" || hasConfiguredLocalAuthUrl(),
   session: {
     strategy: "jwt",
   },
@@ -189,6 +207,8 @@ export const authOptions: NextAuthConfig = {
     },
   },
   pages: {
+    // The localized onboarding screen renders explicit provider buttons. Keeping
+    // one canonical entry point also lets Auth.js preserve callbackUrl safely.
     signIn: "/onboarding",
   },
 };

@@ -1,13 +1,17 @@
-import { apiOk, handleApiError, parseJson } from "@/lib/api";
+import { NotFoundError, apiOk, handleApiError, parseJson } from "@/lib/api";
 import { commentSchema } from "@/lib/schemas";
-import { addComment } from "@/lib/store";
 import { requireSessionUserId } from "@/lib/auth";
+import { createDiscussionComment } from "@/lib/discussions";
+import { getExchangeFeatureFlags } from "@/lib/feature-flags";
 
 export async function POST(request: Request) {
   try {
     const payload = commentSchema.parse(await parseJson(request));
+    const features = getExchangeFeatureFlags();
+    if (payload.postId && !features.community) throw new NotFoundError("Community is not available.");
+    if (payload.predictionMarketId && !features.predictions) throw new NotFoundError("Predictions are not available.");
     return apiOk({
-      comment: await addComment(payload.characterId, payload.content, await requireSessionUserId()),
+      comment: await createDiscussionComment(payload, await requireSessionUserId()),
     });
   } catch (error) {
     return handleApiError(error);

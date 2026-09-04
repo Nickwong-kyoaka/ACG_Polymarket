@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BriefcaseBusiness, Flag, Heart, Images, Languages, Radio, UserRound } from "lucide-react";
+import { BriefcaseBusiness, ChartNoAxesCombined, Heart, Languages, Newspaper, Radio, UserRound } from "lucide-react";
 import { getExchangeCopy, localeFromPathname, localePath, stripLocale } from "@/components/acg-locale";
+import type { ExchangeFeatureFlags } from "@/lib/feature-flags";
 import { cn } from "@/lib/utils";
 
 const desktopNav = [
   { href: "/", key: "home" },
+  { href: "/community", key: "community" },
   { href: "/market", key: "market" },
+  { href: "/predictions", key: "predictions" },
   { href: "/campaigns", key: "campaigns" },
   { href: "/gallery", key: "gallery" },
   { href: "/comfort", key: "comfort" },
@@ -17,19 +20,26 @@ const desktopNav = [
 ] as const;
 
 const mobileNav = [
+  { href: "/community", key: "community", icon: Newspaper },
   { href: "/market", key: "market", icon: Radio },
-  { href: "/campaigns", key: "campaigns", icon: Flag },
+  { href: "/predictions", key: "predictions", icon: ChartNoAxesCombined },
   { href: "/comfort", key: "comfort", icon: Heart },
-  { href: "/gallery", key: "gallery", icon: Images },
   { href: "/me", key: "me", icon: UserRound },
 ] as const;
 
-export function SiteHeader({ signedIn = false, viewerName }: { signedIn?: boolean; viewerName?: string | null }) {
+export function SiteHeader({ signedIn = false, viewerName, features = { community: true, predictions: true, submissions: true } }: { signedIn?: boolean; viewerName?: string | null; features?: ExchangeFeatureFlags }) {
   const pathname = usePathname();
   const locale = localeFromPathname(pathname);
   const copy = getExchangeCopy(locale);
   const basePath = stripLocale(pathname);
   const isAdmin = basePath === "/admin" || basePath.startsWith("/admin/");
+  const visibleDesktopNav = desktopNav.filter((item) => (item.key !== "community" || features.community) && (item.key !== "predictions" || features.predictions));
+  const visibleMobileNav = mobileNav.filter((item) => (item.key !== "community" || features.community) && (item.key !== "predictions" || features.predictions));
+  const navLabel = (key: (typeof desktopNav)[number]["key"] | (typeof mobileNav)[number]["key"]) => {
+    if (key === "community") return locale === "zh-Hant" ? "社群" : "Clubroom";
+    if (key === "predictions") return locale === "zh-Hant" ? "預測" : "Predictions";
+    return copy.nav[key];
+  };
 
   function isActive(href: string) {
     return href === "/" ? basePath === "/" : basePath === href || basePath.startsWith(`${href}/`);
@@ -50,13 +60,13 @@ export function SiteHeader({ signedIn = false, viewerName }: { signedIn?: boolea
           </Link>
 
           <nav className="hidden items-center gap-1 xl:flex" aria-label="Primary navigation">
-            {desktopNav.map((item) => (
+            {visibleDesktopNav.map((item) => (
               <Link
                 key={item.href}
                 href={localePath(locale, item.href)}
                 className={cn("exchange-nav-link", isActive(item.href) && "is-active")}
               >
-                {copy.nav[item.key]}
+                {navLabel(item.key)}
               </Link>
             ))}
           </nav>
@@ -78,7 +88,7 @@ export function SiteHeader({ signedIn = false, viewerName }: { signedIn?: boolea
                 </Link>
               ))}
             </div>
-            <Link href={signedIn ? localePath(locale, "/me") : "/api/auth/signin"} className="exchange-signin hidden sm:inline-flex">
+            <Link href={signedIn ? localePath(locale, "/me") : localePath(locale, "/onboarding")} className="exchange-signin hidden sm:inline-flex">
               {signedIn ? viewerName ?? copy.nav.me : copy.common.signIn}
             </Link>
           </div>
@@ -86,12 +96,12 @@ export function SiteHeader({ signedIn = false, viewerName }: { signedIn?: boolea
       </header>
 
       <nav className="mobile-bottom-nav xl:hidden" aria-label="Mobile navigation">
-        {mobileNav.map((item) => {
+        {visibleMobileNav.map((item) => {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={localePath(locale, item.href)} className={cn("mobile-nav-link", isActive(item.href) && "is-active")}>
               <Icon className="h-[19px] w-[19px]" strokeWidth={2.2} />
-              <span>{copy.nav[item.key]}</span>
+              <span>{navLabel(item.key)}</span>
             </Link>
           );
         })}
