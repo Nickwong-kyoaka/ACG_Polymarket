@@ -8,6 +8,12 @@ Character support and event predictions are deliberately separate:
 - Prediction pages quote `YES / NO` probabilities using a binary LMSR market maker.
 - SUP is earned inside the site. It cannot be purchased, transferred, withdrawn, or exchanged for cash.
 
+## Project status and roadmap
+
+V3 is partially complete. The route and architecture overview below describes the current foundation; some user flows still need to be connected or corrected before wider public testing.
+
+See [项目现状与发展路线图](PROJECT_STATUS_AND_ROADMAP.md) for the source audit dated 2026-11-03, implemented capabilities, known gaps, P0-P3 priorities, and acceptance criteria. The audit distinguishes historical verification from checks repeated on the audited code.
+
 ## Stack
 
 - Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4
