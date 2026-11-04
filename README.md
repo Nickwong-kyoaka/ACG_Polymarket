@@ -16,6 +16,8 @@ See [项目现状与发展路线图](PROJECT_STATUS_AND_ROADMAP.md) for the sour
 
 The 2026-11-04 implementation update at the top of that document supersedes the original gap list. See [database upgrade notes](prisma/UPGRADE.md) before operating on an existing beta database.
 
+See [UI/UX 审查与设计改进方案](UIUX_DESIGN_AUDIT.md) for the 2026-11-04 design audit, reference-site comparison, 20 evidence-backed findings, core-page wireframes, and phased acceptance criteria. These are recommendations, not an implemented redesign.
+
 ## Stack
 
 - Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4
