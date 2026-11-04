@@ -54,6 +54,7 @@ test("sign in, persist a draft, edit and submit for review", async ({ page }) =>
 test("language switch retains filters and support drawer restores keyboard focus", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/en/market?search=Akari&sort=quote");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole("link", { name: "繁", exact: true }).click();
   await expect(page).toHaveURL(/\/zh-Hant\/market\?search=Akari&sort=quote/);
   await expect(page.getByRole("searchbox")).toHaveValue("Akari");
@@ -76,6 +77,8 @@ test("language switch retains filters and support drawer restores keyboard focus
   await expect(page).toHaveURL(/\/zh-Hant\/character\/akari-hoshino\?tab=gallery#gallery/);
   await expect(page.getByRole("tab", { name: "畫廊", exact: true })).toHaveAttribute("aria-selected", "true");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator(".mobile-trade-dock")).not.toBeVisible();
 });
 
 test("work starts using the canonical contract and survives reload", async ({ page, request }) => {

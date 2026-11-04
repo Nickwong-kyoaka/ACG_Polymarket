@@ -28,7 +28,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} className="h-full antialiased" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className="min-h-full bg-background text-slate-950">
-        <div className="acg-page-shell relative min-h-dvh overflow-hidden">
+        <div className="acg-page-shell relative min-h-dvh">
           <div className="exchange-noise pointer-events-none fixed inset-0" />
           <div className="relative flex min-h-dvh flex-col">
             <Suspense fallback={<div className="h-14 border-b border-slate-200 bg-white lg:h-16" />}><SiteHeader signedIn={Boolean(session?.user?.id)} viewerName={session?.user?.name} features={features} balance={account?.wallet?.softBalance} unreadCount={account?._count.notifications} /></Suspense>

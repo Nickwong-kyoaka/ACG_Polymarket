@@ -22,19 +22,19 @@ export function CharacterCard({ character, watching = false, commentCount = 0, a
   const zh = locale === "zh-Hant";
 
   return <article className="character-card exchange-panel group overflow-hidden bg-white">
-    <div className="flex gap-4 p-4">
-      <Link href={href} aria-label={localized.name} className="block w-24 shrink-0 overflow-hidden rounded-xl sm:w-28">
-        <CharacterArt character={localized} asset={asset} locale={locale} compact sizes="112px" className="!min-h-0 aspect-[4/5] h-full" />
+    <div className="grid min-w-0">
+      <Link href={href} aria-label={localized.name} className="block w-full overflow-hidden">
+        <CharacterArt character={localized} asset={asset} locale={locale} compact sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw" className="!min-h-0 aspect-[4/5]" />
       </Link>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 p-3 [overflow-wrap:anywhere]">
         <p className="text-xs leading-5 text-slate-500">{localized.sourceTitle ?? localized.title}</p>
-        <h3 className="mt-1 font-display text-xl leading-tight"><Link href={href} className="hover:underline">{localized.name}</Link></h3>
+        <h3 className="mt-1 font-display text-base leading-snug"><Link href={href} className="hover:underline">{localized.name}</Link></h3>
         <p className="mt-3 text-xs text-slate-600">{zh ? "每份應援價格" : "Support-unit price"}</p>
         <p className="mt-1 text-lg font-bold text-slate-900">{currencyLabel(getBuyQuote(character))}</p>
         <p className="mt-1 text-xs text-slate-500">{zh ? "虛擬應援份數，非機率" : "Virtual support units, not probability"}</p>
       </div>
     </div>
-    <div className="grid gap-3 border-t border-slate-200 p-4">
+    <div className="grid min-w-0 gap-3 border-t border-slate-200 p-3 [overflow-wrap:anywhere]">
       {asset ? <CharacterSourceStatus locale={locale} permissionStatus={asset.permissionStatus} sourceKind={asset.sourceKind} /> : <p className="text-xs text-slate-600">{character.rightsType === "ORIGINAL" ? copy.common.original : copy.common.metadata}</p>}
       <p className="text-xs leading-5 text-slate-600">{compactNumber(character.supporterCount)} {copy.common.supporters} · {compactNumber(commentCount)} {copy.common.comments}</p>
       {activity24h ? <p className="text-xs leading-5 text-slate-600">{zh ? "24 小時應援" : "24h support"}: +{activity24h.buyUnits} · {activity24h.uniqueSupporters} {zh ? "人" : "fans"}</p> : null}

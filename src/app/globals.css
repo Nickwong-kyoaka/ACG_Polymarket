@@ -670,7 +670,7 @@ button:disabled { cursor: not-allowed; }
 .onboarding-cover-copy { min-height: 0; padding: 28px; }
 .community-feed { gap: 16px; }
 @media (min-width: 768px) { .social-note-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; } .discovery-highlights { grid-template-columns: 1fr 1fr; } }
-@media (min-width: 1024px) { .site-toolbar { min-height: 64px; padding-inline: 24px; } .site-tools { gap: 8px; } .mobile-bottom-nav { display: none; } .character-detail,.prediction-detail { padding-bottom: 48px; } }
+@media (min-width: 1024px) { .site-toolbar { min-height: 64px; padding-inline: 24px; } .site-tools { gap: 8px; } .mobile-bottom-nav,.mobile-trade-dock { display: none; } .character-detail,.prediction-detail { padding-bottom: 48px; } }
 @media (min-width: 1200px) { .social-note-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 20px; } }
 @media (max-width: 767px) { .discovery-page { gap: 12px; padding-top: 12px; } .discovery-heading p { display: none; } .discovery-highlights>.prediction-highlight { display: none; } .discovery-links { display: none; } .exchange-title,[data-public-locale="zh-Hant"] .exchange-title { font-size: 1.75rem; line-height: 1.3; letter-spacing: -.02em; } .social-reason,.social-note-topics { display: none; } .social-note-actions .social-action:nth-child(4) { display: inline-flex; } }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }

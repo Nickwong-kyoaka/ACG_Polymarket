@@ -47,6 +47,7 @@ describe("character image accessibility and compact cards", () => {
     expect(screen.getByRole("heading", { name: "Demo" })).toBeInTheDocument();
     expect(screen.getByText("Signal series")).toBeVisible();
     expect(screen.getByText("Support-unit price")).toBeVisible();
+    expect(screen.getAllByRole("link", { name: "Demo" })[0]).toHaveClass("w-full");
     expect(screen.getByText("Virtual support units, not probability")).toBeVisible();
     fireEvent.error(screen.getByRole("img", { name: "Look" }));
     expect(screen.getByText("Permission unverified")).toBeVisible();
