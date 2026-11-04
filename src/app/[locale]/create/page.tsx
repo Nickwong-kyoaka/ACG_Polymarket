@@ -36,11 +36,11 @@ export default async function CreatePage({ params, searchParams }: { params: Pro
   ]) : [[], []];
 
   return <div className="create-page">
-    <Link href={localePath(locale, "/community")} className="post-back-link"><ArrowLeft />{zh ? "回到社群手帳" : "Back to the clubroom"}</Link>
-    <header className="create-masthead"><span><Feather />CREATOR DESK / OPEN</span><h1>{zh ? "寫下一頁，讓同好剛好遇見。" : "Leave a page for another fan to find."}</h1><p>{zh ? "衣裝細節、角色考據、季番觀後感、安慰片段或一個有來源的預測想法，都可以從這張桌開始。" : "An outfit detail, lore note, seasonal impression, comfort moment, or source-led prediction can all begin at this desk."}</p></header>
+    <Link href={localePath(locale, "/community")} className="post-back-link"><ArrowLeft />{zh ? "返回社群" : "Back to community"}</Link>
+    <header className="create-masthead"><span><Feather />{zh ? "創作" : "Create"}</span><h1>{zh ? "寫筆記" : "Write a note"}</h1><p>{zh ? "分享你留意到的衣裝細節、作品感想，或一個有資料支持的猜想。" : "Share an outfit detail, your thoughts on a series, or a prediction backed by a source."}</p></header>
     {session?.user?.id ? <PostComposer initialPost={initialPost ?? undefined} locale={locale} creatorSeries={creatorSeries} initialCreatorSeriesId={creatorSeries.some((item) => item.id === initialCreatorSeriesId) ? initialCreatorSeriesId : undefined}
       characters={characters.map((item) => ({ id: item.id, slug: item.slug, title: item.locales.find((copy) => copy.locale === dbLocale)?.name ?? item.name }))}
       topics={topics.map((item) => ({ id: item.id, slug: item.slug, title: item.locales.find((copy) => copy.locale === dbLocale)?.title ?? item.title }))} />
-      : <section className="create-signin"><div><span>01 / SIGN IN</span><h2>{zh ? "先認領你的作者頁。" : "Claim your creator page first."}</h2><p>{zh ? "登入後可以保存草稿、追蹤審核狀態，也能在留言出現時收到通知。" : "Sign in to keep drafts, follow review status, and hear when readers leave a note."}</p></div><AuthEntry locale={locale} googleEnabled={availability.google} demoEnabled={availability.demo} redirectTo={localePath(locale, "/create")} /></section>}
+      : <section className="create-signin"><div><span>{zh ? "登入" : "Sign in"}</span><h2>{zh ? "登入後開始創作" : "Sign in to start writing"}</h2><p>{zh ? "保存草稿、查看審核進度，也能收到讀者的回覆。" : "Save drafts, check review progress, and hear from your readers."}</p></div><AuthEntry locale={locale} googleEnabled={availability.google} demoEnabled={availability.demo} redirectTo={localePath(locale, "/create")} /></section>}
   </div>;
 }

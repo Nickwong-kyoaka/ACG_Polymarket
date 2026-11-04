@@ -1,5 +1,14 @@
 export type SocialFeedTab = "for-you" | "following" | "seasonal";
 
+export function socialNoteKind(kind: string, locale: "en" | "zh-Hant") {
+  const labels: Record<string, [string, string]> = {
+    NOTE: ["Note", "筆記"], OUTFIT: ["Outfit", "衣裝"], COMIC: ["Comic", "漫畫"],
+    VOICE: ["Voice", "語音"], GUIDE: ["Guide", "考據"], PREDICTION_TAKE: ["Prediction analysis", "預測分析"],
+    CHARACTER: ["Character", "角色"],
+  };
+  return (labels[kind] ?? labels.NOTE)[locale === "zh-Hant" ? 1 : 0];
+}
+
 export interface SocialNoteMedia {
   id: string;
   url: string | null;

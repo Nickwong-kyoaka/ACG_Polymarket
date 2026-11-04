@@ -12,12 +12,12 @@ export function SectionHeading({
   className?: string;
 }) {
   return (
-    <div className={`flex max-w-3xl flex-col gap-3 ${className ?? ""}`}>
-      <p className={`exchange-kicker ${tone === "light" ? "text-[#ffcc66] before:bg-[#ffcc66]" : ""}`}>
+    <div className={`flex max-w-3xl flex-col gap-2 ${className ?? ""}`}>
+      <p className={`exchange-kicker ${tone === "light" ? "!text-white/80" : ""}`}>
         {eyebrow}
       </p>
-      <h2 className={`font-display text-3xl leading-[1.05] sm:text-4xl lg:text-5xl ${tone === "light" ? "text-white" : "text-[#111827]"}`}>{title}</h2>
-      <p className={`text-base leading-7 sm:text-lg ${tone === "light" ? "text-white/62" : "text-slate-600"}`}>{description}</p>
+      <h2 className={`font-display text-2xl leading-snug sm:text-3xl ${tone === "light" ? "text-white" : "text-[#222733]"}`}>{title}</h2>
+      <p className={`text-sm leading-7 sm:text-base ${tone === "light" ? "text-white/80" : "text-slate-600"}`}>{description}</p>
     </div>
   );
 }

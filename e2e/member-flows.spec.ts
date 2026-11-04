@@ -7,15 +7,26 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("bilingual lobby and mobile layout", async ({ page }) => {
+test("bilingual lobby and mobile layout", async ({ page }, testInfo) => {
   const hydrationErrors: string[] = [];
   page.on("console", (message) => { if (message.type() === "error" && /hydration|did not match/i.test(message.text())) hydrationErrors.push(message.text()); });
   for (const locale of ["en", "zh-Hant"]) {
     await page.goto(`/${locale}`);
     await expect(page.locator("h1")).toBeVisible();
+    const cards = page.locator(".social-note-grid > article");
+    await expect(cards.nth(1)).toBeVisible();
     for (const width of [390, 768, 1440]) {
-      await page.setViewportSize({ width, height: 900 });
+      await page.setViewportSize({ width, height: 844 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      if (width === 390) {
+        const first = await cards.nth(0).boundingBox();
+        const second = await cards.nth(1).boundingBox();
+        expect(first).not.toBeNull();
+        expect(second).not.toBeNull();
+        expect(Math.abs(first!.y - second!.y)).toBeLessThan(4);
+        expect(first!.y + 100).toBeLessThan(744);
+      }
+      await testInfo.attach(`${locale}-${width}`, { body: await page.screenshot(), contentType: "image/png" });
     }
   }
   expect(hydrationErrors).toEqual([]);
@@ -30,14 +41,41 @@ test("sign in, persist a draft, edit and submit for review", async ({ page }) =>
   await page.getByLabel("Title", { exact: true }).fill(title);
   await page.getByLabel("Note", { exact: true }).fill("A small source-free text note saved in the creator desk.");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Draft saved");
+  await expect(page.getByRole("status").filter({ hasText: "Draft saved" }).first()).toBeVisible();
   await page.goto("/en/me/posts");
   const draft = page.getByRole("article").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
   await expect(draft).toContainText("Draft");
-  await draft.getByRole("link", { name: "Edit and preview" }).click();
+  await draft.getByRole("link", { name: "Continue editing" }).click();
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(title);
   await page.getByRole("button", { name: "Submit note", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText(/clubroom table|after review/);
+  await expect(page.getByRole("status").filter({ hasText: /Submitted, awaiting review|Published/ }).first()).toBeVisible();
+});
+
+test("language switch retains filters and support drawer restores keyboard focus", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/en/market?search=Akari&sort=quote");
+  await page.getByRole("link", { name: "繁", exact: true }).click();
+  await expect(page).toHaveURL(/\/zh-Hant\/market\?search=Akari&sort=quote/);
+  await expect(page.getByRole("searchbox")).toHaveValue("Akari");
+  await page.goto("/en/character/akari-hoshino");
+  const trigger = page.getByRole("button", { name: "Open support ticket", exact: true });
+  await trigger.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Close support panel" })).toBeFocused();
+  for (let index = 0; index < 15; index++) {
+    await page.keyboard.press("Tab");
+    expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await expect(trigger).toBeFocused();
+  await page.getByRole("tab", { name: "Gallery", exact: true }).click();
+  await expect(page).toHaveURL(/tab=gallery#gallery/);
+  await page.getByRole("link", { name: "繁", exact: true }).click();
+  await expect(page).toHaveURL(/\/zh-Hant\/character\/akari-hoshino\?tab=gallery#gallery/);
+  await expect(page.getByRole("tab", { name: "畫廊", exact: true })).toHaveAttribute("aria-selected", "true");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test("work starts using the canonical contract and survives reload", async ({ page, request }) => {
@@ -75,5 +113,6 @@ test("earned SUP, signed support trades, replay, comments, and cosmetics persist
   const purchase = await request.post("/api/shop/purchase", { headers: { "Idempotency-Key": `${key}-shop` }, data: { itemId: item.id, equip: true } });
   expect(purchase.ok()).toBe(true);
   await page.goto("/en/character/akari-hoshino");
+  await page.getByRole("tab", { name: "Notes", exact: true }).click();
   await expect(page.getByText(`A lovely stage detail, saved from ${key}.`, { exact: true })).toBeVisible();
 });

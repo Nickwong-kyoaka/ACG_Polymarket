@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ auth: vi.fn(), notes: vi.fn(), preferences: vi
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/prisma", () => ({ prisma: { notification: { findMany: mocks.notes, count: mocks.unread }, notificationPreference: { findUnique: mocks.preferences } } }));
 vi.mock("@/lib/public-search", async (original) => ({ ...await original<typeof import("@/lib/public-search")>(), searchPublicContent: mocks.search }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NOT_FOUND"); }, usePathname: () => "/zh-Hant/community" }));
+vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NOT_FOUND"); }, usePathname: () => "/zh-Hant/community", useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/components/notification-center", () => ({ NotificationCenter: (props: { initialItems: unknown[]; initialNextCursor: string; initialUnreadCount: number }) => <div data-testid="inbox-props">{JSON.stringify(props)}</div> }));
 
 import NotificationsPage from "@/app/[locale]/me/notifications/page";
@@ -45,7 +45,7 @@ describe("localized inbox and discovery pages", () => {
   });
   it("provides a search entry in the header without adding a desktop-only control", () => {
     render(<SiteHeader />);
-    const entry = screen.getByRole("link", { name: "搜尋角色、貼文與作品" });
+    const entry = screen.getByRole("link", { name: "搜尋角色、筆記與作品" });
     expect(entry).toHaveAttribute("href", "/zh-Hant/search");
     expect(entry.className).not.toContain("hidden");
   });

@@ -16,7 +16,9 @@ See [项目现状与发展路线图](PROJECT_STATUS_AND_ROADMAP.md) for the sour
 
 The 2026-11-04 implementation update at the top of that document supersedes the original gap list. See [database upgrade notes](prisma/UPGRADE.md) before operating on an existing beta database.
 
-See [UI/UX 审查与设计改进方案](UIUX_DESIGN_AUDIT.md) for the 2026-11-04 design audit, reference-site comparison, 20 evidence-backed findings, core-page wireframes, and phased acceptance criteria. These are recommendations, not an implemented redesign.
+The UI refresh implements compact discovery, a shorter navigation, character sections, keyboard-safe trade drawers, persistent prediction receipts, context-preserving language changes, and clearer creator/room workflows. The pre-refresh version is preserved on GitHub at `backup/pre-uiux-2026-11-04` (`1280ac7`); development continues on `main`.
+
+See [UI/UX 审查与设计改进方案](UIUX_DESIGN_AUDIT.md) for the original 20 findings and the separate implementation/verification table. Remaining device, accessibility, content, and live-service acceptance is explicitly distinguished from implemented code. Fonts are bundled locally, not fetched from Google at runtime.
 
 ## Stack
 

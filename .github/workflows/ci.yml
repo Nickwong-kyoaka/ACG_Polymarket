@@ -72,3 +72,11 @@ jobs:
             node -e 'const fs = require("node:fs"); const tail = fs.readFileSync(process.env.ACG_E2E_LOG, "utf8").slice(-24000); console.log("::error title=Browser acceptance failed::" + tail.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A"));'
             exit 1
           fi
+      - name: Keep browser screenshots and failure traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-ui-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

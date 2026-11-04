@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BookOpenCheck, Landmark, TimerReset } from "lucide-react";
 import { notFound } from "next/navigation";
-import { isPublicLocale, localePath, pick, type PublicLocale } from "@/components/acg-locale";
-import { LobbyPredictionTicket } from "@/components/lobby-prediction-ticket";
+import { isPublicLocale, localePath, type PublicLocale } from "@/components/acg-locale";
+import { PredictionMarketState, predictionState } from "@/components/prediction-market-state";
 import { getExchangeFeatureFlags } from "@/lib/feature-flags";
 import { listPredictionEvents } from "@/lib/prediction-market";
 
@@ -29,15 +29,15 @@ export default async function PredictionsPage({ params }: { params: Promise<{ lo
   const zh = locale === "zh-Hant";
 
   return (
-    <div className="exchange-page">
-      <section className="grid gap-6 border-y border-[#2c2724] py-8 lg:grid-cols-[1.05fr_.95fr] lg:items-end lg:py-12">
+    <div className="exchange-page text-[#222733]">
+      <section className="grid gap-5 border-b border-slate-200 pb-6 lg:grid-cols-[1.1fr_.9fr] lg:items-end">
         <div>
-          <p className="exchange-kicker">SEASON PREDICTION DESK / 03</p>
-          <h1 className="exchange-title mt-5">{zh ? "下一則消息出現以前，先留下你的判斷。" : "Leave your read before the next announcement arrives."}</h1>
+          <p className="text-xs font-semibold text-[#C4455C]">{zh ? "ACG 季番預測" : "ACG SEASON PREDICTIONS"}</p>
+          <h1 className="mt-3 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{zh ? "下一則消息前，你怎麼看？" : "What happens next?"}</h1>
         </div>
-        <div className="lg:border-l lg:border-[#2c2724]/25 lg:pl-8">
-          <p className="text-base leading-8 text-[#716862]">{zh ? "每一題都有明確截止時間和公開結算來源。Yes / No 的票面數字代表目前機率；角色應援頁的 SUP / 份則只代表支持熱度，兩張桌不會混在一起。" : "Every question has a deadline and public resolution source. Yes / No ticket prices show current probability; SUP per unit on character pages remains a support signal. The two desks stay separate."}</p>
-          <div className="mt-5 flex flex-wrap gap-3"><Link href={localePath(locale, "/me/predictions")} className="exchange-button-primary">{zh ? "我的預測票簿" : "My prediction book"}<ArrowRight className="h-4 w-4" /></Link><Link href={localePath(locale, "/help/market-rules")} className="exchange-button-secondary">{zh ? "讀結算方式" : "Read resolution guide"}</Link></div>
+        <div>
+          <p className="text-sm leading-6 text-[#606A78]">{zh ? "每題都有公開來源和截止時間。YES / NO 是目前機率，與角色應援熱度不同；使用站內 SUP，不涉及現金。" : "Public sources, clear deadlines, earned SUP. YES / NO shows current probability, not character support. No cash is involved."}</p>
+          <div className="mt-4 flex flex-wrap gap-3"><Link href={localePath(locale, "/me/predictions")} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#C4455C] px-4 text-sm font-semibold text-white">{zh ? "我的預測記錄" : "My predictions"}<ArrowRight className="h-4 w-4" /></Link><Link href={localePath(locale, "/help/market-rules")} className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-[#606A78]">{zh ? "結算規則" : "Resolution guide"}</Link></div>
         </div>
       </section>
 
@@ -46,19 +46,19 @@ export default async function PredictionsPage({ params }: { params: Promise<{ lo
           [BookOpenCheck, zh ? "來源先行" : "Source first", zh ? "官方公告或公開資料頁會固定在票面旁。" : "Official announcements or public data pages stay beside the ticket."],
           [TimerReset, zh ? "截止後鎖定" : "Locked at close", zh ? "停止交易後進入提出結果與 24 小時挑戰期。" : "Trading stops before proposal and a 24-hour challenge window."],
           [Landmark, zh ? "站內 SUP" : "Earned SUP only", zh ? "每份勝出時結算 100 SUP，不涉及充值或現金。" : "A winning share settles at 100 SUP, with no purchase or cash value."],
-        ].map(([Icon, title, body]) => <article key={String(title)} className="border-l-4 border-[#c85d5a] bg-[#fffaf4] p-5"><Icon className="h-5 w-5 text-[#5f8f87]" /><h2 className="mt-4 font-display text-xl">{String(title)}</h2><p className="mt-2 text-xs leading-6 text-[#716862]">{String(body)}</p></article>)}
+        ].map(([Icon, title, body]) => <article key={String(title)} className="rounded-2xl border border-slate-200 bg-white p-4"><Icon className="h-5 w-5 text-[#177B65]" /><h2 className="mt-3 text-base font-bold">{String(title)}</h2><p className="mt-2 text-xs leading-6 text-[#606A78]">{String(body)}</p></article>)}
       </section>
 
       <section>
-        <div className="mb-7 flex items-end justify-between gap-5"><div><p className="exchange-kicker">OPEN QUESTIONS</p><h2 className="mt-3 font-display text-4xl sm:text-5xl">{zh ? "正在交換的判斷" : "Reads on the table"}</h2></div><span className="font-display text-5xl text-[#c85d5a]">{String(openMarkets.length).padStart(2, "0")}</span></div>
-        {openMarkets.length ? <div className="grid gap-8 lg:grid-cols-2 xl:grid-cols-3">{openMarkets.map(({ event, market }) => {
+        <div className="mb-5 flex items-center justify-between gap-5"><h2 className="text-xl font-bold">{zh ? "交易中的題目" : "Open questions"}</h2><span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-[#606A78]">{openMarkets.length}</span></div>
+        {openMarkets.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{openMarkets.map(({ event, market }) => {
           const yes = market.outcomes.find((outcome) => outcome.key === "YES")?.probabilityBps ?? 5_000;
-          return <LobbyPredictionTicket key={market.id} href={localePath(locale, `/predictions/${market.slug}`)} eyebrow={event.title} question={market.question} yesLabel="YES" noLabel="NO" yesProbability={yes / 10_000} participants={market.participantCount} closesLabel={new Intl.DateTimeFormat(zh ? "zh-HK" : "en", { dateStyle: "medium", timeZone: "Asia/Hong_Kong" }).format(new Date(market.closesAt))} confidenceLabel={market.tradeCount > 20 ? pick(locale, "ACTIVE READ", "活躍觀測") : pick(locale, "EARLY READ", "早期判斷")} />;
-        })}</div> : <div className="border border-dashed border-[#2c2724]/30 bg-[#fffaf4] p-8 text-center"><p className="font-display text-2xl">{zh ? "今天沒有開放中的題目" : "No questions are open today"}</p><p className="mt-2 text-sm text-[#716862]">{zh ? "新的季番訊號整理好後會出現在這裡。" : "New seasonal signals will appear here once their sources are ready."}</p></div>}
+          return <article key={market.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-[#606A78]">{event.title}</p><PredictionMarketState status={market.status} locale={locale} /></div><Link href={localePath(locale, `/predictions/${market.slug}`)} className="mt-3 inline-flex min-h-11 items-center text-lg font-bold leading-6 hover:text-[#C4455C]">{market.question}</Link><div className="mt-4 grid grid-cols-2 gap-2">{(["YES", "NO"] as const).map((outcome) => <Link key={outcome} href={`${localePath(locale, `/predictions/${market.slug}`)}?outcome=${outcome}`} className={`flex min-h-11 items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold ${outcome === "YES" ? "bg-[#177B65]/5 text-[#177B65]" : "bg-[#B8495E]/5 text-[#B8495E]"}`}><span>{outcome}</span><strong className="text-xl">{((outcome === "YES" ? yes : 10_000 - yes) / 100).toFixed(1)}%</strong></Link>)}</div><p className="mt-4 border-t border-slate-100 pt-3 text-xs leading-5 text-[#606A78]">{market.participantCount} {zh ? "位參與者 · 截止" : "participants · closes"} {new Intl.DateTimeFormat(zh ? "zh-HK" : "en", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Hong_Kong" }).format(new Date(market.closesAt))} HKT</p></article>;
+        })}</div> : <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center"><p className="text-xl font-bold">{zh ? "今天沒有開放中的題目" : "No questions are open today"}</p><p className="mt-2 text-sm text-[#606A78]">{zh ? "新的季番訊號整理好後會出現在這裡。" : "New seasonal signals will appear here once their sources are ready."}</p></div>}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        {events.map((event, index) => <article key={event.id} className="border-t border-[#2c2724] pt-5"><div className="flex items-start justify-between gap-5"><div><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#9a4c4a]">{event.category}</p><h2 className="mt-2 font-display text-3xl">{event.title}</h2></div><span className="font-display text-4xl text-[#d59b42]">0{index + 1}</span></div><p className="mt-3 max-w-2xl text-sm leading-7 text-[#716862]">{event.description}</p><div className="mt-5 grid gap-2">{event.markets.map((market) => <Link key={market.id} href={localePath(locale, `/predictions/${market.slug}`)} className="flex items-center justify-between gap-3 border border-[#2c2724]/20 bg-[#fffaf4] px-4 py-3 text-sm font-bold transition hover:border-[#2c2724]"><span>{market.question}</span><ArrowRight className="h-4 w-4 shrink-0" /></Link>)}</div></article>)}
+        {events.map((event) => <article key={event.id} className="border-t border-slate-200 pt-5"><h2 className="text-xl font-bold">{event.title}</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-[#606A78]">{event.description}</p><div className="mt-4 grid gap-2">{event.markets.map((market) => <Link key={market.id} href={localePath(locale, `/predictions/${market.slug}`)} className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm transition hover:border-[#C4455C]"><span><strong className="block">{market.question}</strong><span className="mt-1 block text-xs text-[#606A78]">{predictionState(market.status, locale).next}</span></span><span className="flex shrink-0 items-center gap-2"><PredictionMarketState status={market.status} locale={locale} /><ArrowRight className="h-4 w-4 shrink-0" /></span></Link>)}</div></article>)}
       </section>
     </div>
   );

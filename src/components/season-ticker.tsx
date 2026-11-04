@@ -1,13 +1,11 @@
-import { pick, type PublicLocale } from "@/components/acg-locale";
+import Link from "next/link";
+import { localePath, pick, type PublicLocale } from "@/components/acg-locale";
 
 export function SeasonTicker({ locale }: { locale: PublicLocale }) {
-  const signals = [
-    pick(locale, "SUMMER 2026 CATALOG IS OPEN", "2026 夏季場刊已翻開"),
-    pick(locale, "DAILY CHECK-IN +100 SUP", "每日簽到 +100 SUP"),
-    pick(locale, "A VOICE NOTE FROM EVERY CHARACTER", "每名角色都有一張語音便條"),
-    pick(locale, "COMFORT ROOMS GLOWING TONIGHT", "今晚的角色安慰室亮著燈"),
-    pick(locale, "NEW OUTFITS IN THE CHARACTER GALLERY", "角色畫廊有新的服裝造型"),
-  ];
-
-  return <div className="season-ticker"><div className="season-ticker-track">{[...signals, ...signals].map((item, index) => <span className="season-ticker-item" key={`${item}-${index}`}>{item}</span>)}</div></div>;
+  return <nav className="season-ticker" aria-label={pick(locale, "Explore more", "更多探索")}><div className="season-ticker-track">{[
+    { href: "/?feed=seasonal#season", label: pick(locale, "This season", "本季新番") },
+    { href: "/gallery", label: pick(locale, "Character gallery", "角色圖集") },
+    { href: "/comfort", label: pick(locale, "Comfort", "陪伴") },
+    { href: "/campaigns", label: pick(locale, "Community campaigns", "應援活動") },
+  ].map((item) => <Link key={item.href} href={localePath(locale, item.href)} className="season-ticker-item">{item.label}</Link>)}</div></nav>;
 }

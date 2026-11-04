@@ -19,6 +19,7 @@ export function ShopPanel({ items, inventory, profile, assets = [], locale = "en
   const [pending, startTransition] = useTransition();
   const [previewId, setPreviewId] = useState<string | null>(null);
   const locked = useRef(false);
+  const previewRef = useRef<HTMLDivElement>(null);
   const keys = useRoomMutationKeys();
 
   async function purchase(itemId: string) {
@@ -51,8 +52,8 @@ export function ShopPanel({ items, inventory, profile, assets = [], locale = "en
   const appearance = profile && preview ? { ...profile, ...(preview.kind === "AVATAR_FRAME" ? { equippedFrameAsset: preview.unlockPayload.assetId } : preview.kind === "PROFILE_THEME" ? { equippedThemeAsset: preview.unlockPayload.assetId } : {}) } : profile;
   return (
     <div className="grid gap-5">
-      {appearance ? <ProfileAppearance profile={appearance} assets={assets} locale={locale} preview={Boolean(preview)} /> : null}
-      {preview ? <button type="button" onClick={() => setPreviewId(null)} className="exchange-button-secondary w-fit">{pick(locale, "Return to equipped look", "返回已裝備外觀")}</button> : null}
+      {appearance ? <div ref={previewRef} tabIndex={-1} className="scroll-mt-24 rounded-xl" role="region" aria-label={pick(locale, "Room appearance preview", "房間外觀預覽")}><ProfileAppearance profile={appearance} assets={assets} locale={locale} preview={Boolean(preview)} /></div> : null}
+      {preview ? <button type="button" disabled={busy} onClick={() => setPreviewId(null)} className="exchange-button-secondary w-fit">{pick(locale, "Return to equipped look", "返回已裝備外觀")}</button> : null}
       {status ? <p role="status" className="rounded-[16px_4px_16px_4px] bg-[#f5f1e8] px-4 py-3 text-sm font-bold text-slate-700">{status}</p> : null}
       <div className="grid gap-5 xl:grid-cols-2">
         {items.map((sourceItem) => {
@@ -67,8 +68,8 @@ export function ShopPanel({ items, inventory, profile, assets = [], locale = "en
                 <span className="absolute bottom-4 left-4 z-10 rounded-full bg-[#111827]/80 px-3 py-1 text-[10px] font-black uppercase tracking-[.16em] text-white">{item.previewLabel}</span>
               </div>
               <div className="flex flex-col p-5 md:py-6 md:pr-6 md:pl-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#e83c62]">{item.kind.replaceAll("_", " ")}</p>
-                <h3 className="mt-3 font-display text-3xl text-[#111827]">{item.title}</h3>
+                <p className="text-xs font-semibold text-[#c4455c]">{({ AVATAR_FRAME: pick(locale, "Avatar frame", "頭像框"), PROFILE_THEME: pick(locale, "Profile theme", "個人主題"), WALLPAPER: pick(locale, "Wallpaper", "壁紙"), VOICE_PACK: pick(locale, "Voice pack", "語音包"), COMIC_PACK: pick(locale, "Comic pack", "漫畫包") } as Record<string, string>)[item.kind] ?? pick(locale, "Collection", "收藏品")}</p>
+                <h3 className="mt-2 text-xl font-bold text-[#222733]">{item.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-slate-600">{item.description}</p>
                 <div className="mt-auto flex items-center justify-between gap-4 pt-5">
                   <p className="text-lg font-black text-slate-950">{currencyLabel(item.price)}</p>
@@ -77,7 +78,7 @@ export function ShopPanel({ items, inventory, profile, assets = [], locale = "en
                     {!profile ? pick(locale, "Sign in to unlock", "登入後解鎖") : owned ? (equipped ? copy.shop.equipped : copy.shop.equipAgain) : copy.shop.unlock}
                   </button>
                 </div>
-                {profile && asset && ["AVATAR_FRAME", "PROFILE_THEME"].includes(item.kind) ? <button type="button" onClick={() => setPreviewId(item.id)} className="mt-3 w-fit text-xs font-black underline">{pick(locale, "Preview in my room", "在我的房間預覽")}</button> : null}
+                {profile && asset && ["AVATAR_FRAME", "PROFILE_THEME"].includes(item.kind) ? <button type="button" disabled={busy} onClick={() => { setPreviewId(item.id); previewRef.current?.focus({ preventScroll: true }); previewRef.current?.scrollIntoView?.({ behavior: "instant", block: "nearest" }); }} className="mt-3 min-h-11 w-fit text-sm font-bold underline">{pick(locale, "Preview in my room", "在我的房間預覽")}</button> : null}
               </div>
             </article>
           );

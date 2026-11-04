@@ -1,7 +1,9 @@
+"use client";
+
 import Image from "next/image";
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { getSafeCharacterImage } from "@/lib/character-visuals";
-import type { PublicCharacterAsset } from "@/lib/public-assets";
+import { safePublicMediaUrl, type PublicCharacterAsset } from "@/lib/public-assets";
 import { cn } from "@/lib/utils";
 import type { Character } from "@/lib/types";
 
@@ -11,14 +13,22 @@ export function CharacterArt({
   priority = false,
   sizes = "(min-width: 1024px) 48vw, 100vw",
   asset,
+  locale = "en",
+  compact = false,
 }: {
   character: Character;
   className?: string;
   priority?: boolean;
   sizes?: string;
   asset?: Pick<PublicCharacterAsset, "publicUrl" | "altText">;
+  locale?: "en" | "zh-Hant";
+  compact?: boolean;
 }) {
-  const imageUrl = asset?.publicUrl ?? getSafeCharacterImage(character);
+  const imageUrl = safePublicMediaUrl(asset?.publicUrl ?? getSafeCharacterImage(character));
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showImage = Boolean(imageUrl && failedUrl !== imageUrl);
+  const alt = asset?.altText?.trim() || `${character.name} · ${character.sourceTitle ?? character.title}`;
+  const fallback = locale === "zh-Hant" ? (imageUrl ? "圖片暫時無法載入" : "尚無可展示的角色圖片") : (imageUrl ? "Image temporarily unavailable" : "No character image available");
   const posterStyle = {
     "--signal-from": character.accentFrom,
     "--signal-to": character.accentTo,
@@ -26,36 +36,42 @@ export function CharacterArt({
 
   return (
     <div
-      className={cn("character-art relative isolate overflow-hidden", imageUrl ? "has-key-art" : "signal-poster", className)}
+      className={cn("character-art relative isolate aspect-[4/5] overflow-hidden", showImage ? "has-key-art" : "signal-poster", className)}
       style={posterStyle}
     >
-      {imageUrl?.startsWith("/") ? (
+      {showImage && imageUrl?.startsWith("/") ? (
         <Image
           src={imageUrl}
-          alt={asset?.altText ?? `${character.name} original character key visual`}
+          alt={alt}
           fill
           sizes={sizes}
-          className="object-cover object-top transition duration-700 group-hover:scale-[1.025]"
-          priority={priority}
+          className="object-cover object-top transition duration-700 motion-safe:group-hover:scale-[1.025] motion-reduce:transition-none"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
+          onError={() => setFailedUrl(imageUrl)}
         />
-      ) : imageUrl ? (
-        <div
-          role="img"
-          aria-label={asset?.altText ?? `${character.name} character visual`}
-          className="absolute inset-0 bg-cover bg-top transition duration-700 group-hover:scale-[1.025]"
-          style={{ backgroundImage: `url(${JSON.stringify(imageUrl)})` }}
+      ) : showImage && imageUrl ? (
+        // Remote sources stay direct: no new proxy, download, or rights assumption.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageUrl}
+          alt={alt}
+          width={800}
+          height={1000}
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailedUrl(imageUrl)}
+          className="absolute inset-0 h-full w-full object-cover object-top"
         />
       ) : (
-        <>
-          <div className="signal-orbit signal-orbit-one" />
-          <div className="signal-orbit signal-orbit-two" />
-          <div className="signal-silhouette" />
-          <span className="signal-index">{String(character.supporterCount).padStart(3, "0")}</span>
-          <span className="signal-glyph">{character.name.trim().charAt(0).toUpperCase()}</span>
-          <span className="signal-label">METADATA / SUPPORT SIGNAL</span>
-        </>
+        <div role="img" aria-label={`${character.name}: ${fallback}`} className={cn("absolute inset-0 grid place-content-center bg-slate-100 text-center text-slate-600", compact ? "gap-2 p-2" : "gap-3 p-5")}>
+          <span aria-hidden="true" className={cn("font-display", compact ? "text-2xl" : "text-5xl")}>{character.name.trim().charAt(0).toUpperCase()}</span>
+          <span className="text-xs leading-5">{fallback}</span>
+          {!compact ? <span className="text-xs leading-5">{character.sourceTitle ?? character.title}</span> : null}
+        </div>
       )}
-      <div className="character-art-vignette" />
     </div>
   );
 }
