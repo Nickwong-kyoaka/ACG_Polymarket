@@ -3,8 +3,8 @@ import { seedDatabase } from "../src/lib/seed-db";
 import { prisma } from "../src/lib/prisma";
 
 async function main() {
-  await seedDatabase(prisma, seedSnapshot);
-  console.log("Seed database ready.");
+  const result = await seedDatabase(prisma, seedSnapshot);
+  console.log(`Seed database ready (${result.mode}; existing data preserved).`);
   console.log(
     JSON.stringify(
       {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BriefcaseBusiness, ChartNoAxesCombined, Heart, Languages, Newspaper, Radio, UserRound } from "lucide-react";
+import { BriefcaseBusiness, ChartNoAxesCombined, Heart, Languages, Newspaper, Radio, Search, UserRound } from "lucide-react";
 import { getExchangeCopy, localeFromPathname, localePath, stripLocale } from "@/components/acg-locale";
 import type { ExchangeFeatureFlags } from "@/lib/feature-flags";
 import { cn } from "@/lib/utils";
@@ -53,7 +53,7 @@ export function SiteHeader({ signedIn = false, viewerName, features = { communit
         <div className="mx-auto flex h-[72px] max-w-[1480px] items-center justify-between gap-4 px-4 sm:px-6 xl:px-10">
           <Link href={localePath(locale)} className="exchange-logo group" aria-label="ACG Exchange home">
             <span className="exchange-logo-mark"><span>推</span></span>
-            <span className="grid leading-none">
+            <span className="grid leading-none max-[380px]:hidden">
               <span className="exchange-logo-word">ACG EXCHANGE</span>
               <span className="exchange-logo-sub">AFFECTION SIGNAL NETWORK</span>
             </span>
@@ -72,6 +72,7 @@ export function SiteHeader({ signedIn = false, viewerName, features = { communit
           </nav>
 
           <div className="flex items-center gap-2">
+            <Link href={localePath(locale, "/search")} aria-label={features.community ? (locale === "zh-Hant" ? "搜尋角色、貼文與作品" : "Search characters, posts and series") : (locale === "zh-Hant" ? "搜尋角色與作品" : "Search characters and series")} className="exchange-button-secondary h-9 w-9 shrink-0 p-0"><Search className="h-4 w-4" /></Link>
             <Link href={localePath(locale, "/work")} className="exchange-button-secondary hidden px-3 py-2 text-xs sm:inline-flex">
               <BriefcaseBusiness className="mr-1 h-4 w-4 text-[#bd3628]" />
               {copy.nav.work}

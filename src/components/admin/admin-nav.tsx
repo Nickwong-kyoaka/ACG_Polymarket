@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 const adminLinks = [
   { href: "/admin", label: "Command center", short: "Overview", icon: LayoutDashboard },
+  { href: "/admin/analytics", label: "Activity & retention", short: "Activity", icon: Gauge },
   { href: "/admin/content", label: "Characters & comfort", short: "Content", icon: FileHeart },
   { href: "/admin/imports", label: "Bangumi imports", short: "Imports", icon: Database },
   { href: "/admin/assets", label: "Asset workflow", short: "Assets", icon: Images },
@@ -14,6 +15,7 @@ const adminLinks = [
   { href: "/admin/campaigns", label: "Campaign control", short: "Campaigns", icon: FlagTriangleRight },
   { href: "/admin/predictions", label: "Prediction desk", short: "Predict", icon: Gauge },
   { href: "/admin/community", label: "Community review", short: "Posts", icon: MessagesSquare },
+  { href: "/admin/appeals", label: "Moderation appeals", short: "Appeals", icon: ShieldAlert },
   { href: "/admin/knowledge", label: "Knowledge revisions", short: "Revisions", icon: BookCopy },
   { href: "/admin/takedowns", label: "Takedown queue", short: "Safety", icon: ShieldAlert },
 ] as const;

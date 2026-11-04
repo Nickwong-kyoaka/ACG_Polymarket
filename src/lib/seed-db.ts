@@ -1,11 +1,12 @@
 import { seedSnapshot } from "../data/seed";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import type { SeedSnapshot } from "./types";
 import { localizeCharacter, localizeShopItem } from "@/components/acg-locale";
 import { catalogCharactersV2, catalogSeriesV2 } from "@/data/catalog-v2";
 import { syncApprovedMedia } from "@/lib/approved-media";
 
-type SeedClient = typeof prisma;
+type SeedClient = Prisma.TransactionClient;
 
 function asDate(value?: string) {
   return value ? new Date(value) : undefined;
@@ -69,25 +70,26 @@ const v3Topics = [
   { id: "topic-prediction-desk", slug: "prediction-desk", en: ["Prediction desk", "Source-led questions about upcoming ACG news."], zh: ["季番預測桌", "用公開來源一起觀察下一則 ACG 消息。"] },
 ] as const;
 
-async function seedV3Experience(db: SeedClient, snapshot: SeedSnapshot) {
+async function seedV3Experience(db: SeedClient, snapshot: SeedSnapshot, includeDemoContent = true) {
   const viewerId = snapshot.users[0]?.id;
-  if (!viewerId) return;
 
   for (const topic of v3Topics) {
-    await db.topic.upsert({
+    const record = await db.topic.upsert({
       where: { slug: topic.slug },
       create: { id: topic.id, slug: topic.slug, title: topic.en[0], description: topic.en[1], featured: true },
-      update: { title: topic.en[0], description: topic.en[1], featured: true },
+      update: {},
     });
     for (const [locale, copy] of [["EN", topic.en], ["ZH_HANT", topic.zh]] as const) {
       await db.topicLocale.upsert({
-        where: { topicId_locale: { topicId: topic.id, locale } },
-        create: { topicId: topic.id, locale, title: copy[0], description: copy[1] },
-        update: { title: copy[0], description: copy[1] },
+        where: { topicId_locale: { topicId: record.id, locale } },
+        create: { topicId: record.id, locale, title: copy[0], description: copy[1] },
+        update: {},
       });
     }
   }
 
+  // Demo activity belongs only to a fresh fixture, never to an existing user's account.
+  if (includeDemoContent && viewerId) {
   await db.creatorProfile.upsert({
     where: { userId: viewerId },
     create: { userId: viewerId, tagline: "Character notes, quiet rooms, and seasonal signals.", approvedPostCount: 3, probationComplete: true },
@@ -211,28 +213,30 @@ async function seedV3Experience(db: SeedClient, snapshot: SeedSnapshot) {
     });
   }
 
+  }
+
   const predictionEvents = [
     { id: "prediction-event-summer-2026", slug: "summer-2026-watchdesk", category: "SEASON", en: ["Summer 2026 watchdesk", "Objective signals around the current anime season."], zh: ["2026 夏季觀測桌", "一起追蹤本季動畫的公開消息與資料訊號。"] },
     { id: "prediction-event-announcements", slug: "acg-announcement-watch", category: "ANNOUNCEMENT", en: ["Announcement watch", "Source-led questions about upcoming official ACG news."], zh: ["作品情報觀測", "以公開來源追蹤即將到來的作品消息。"] },
   ] as const;
+  const eventIds = new Map<string, string>();
   for (const event of predictionEvents) {
-    await db.predictionEvent.upsert({ where: { slug: event.slug }, create: { id: event.id, slug: event.slug, category: event.category, title: event.en[0], description: event.en[1], featured: true }, update: { title: event.en[0], description: event.en[1], featured: true } });
+    const record = await db.predictionEvent.upsert({ where: { slug: event.slug }, create: { id: event.id, slug: event.slug, category: event.category, title: event.en[0], description: event.en[1], featured: true }, update: {} });
+    eventIds.set(event.id, record.id);
     for (const [locale, copy] of [["EN", event.en], ["ZH_HANT", event.zh]] as const) {
-      await db.predictionEventLocale.upsert({ where: { eventId_locale: { eventId: event.id, locale } }, create: { eventId: event.id, locale, title: copy[0], description: copy[1] }, update: { title: copy[0], description: copy[1] } });
+      await db.predictionEventLocale.upsert({ where: { eventId_locale: { eventId: record.id, locale } }, create: { eventId: record.id, locale, title: copy[0], description: copy[1] }, update: {} });
     }
   }
 
   const predictionMarkets = [
-    { id: "prediction-market-frieren-news", eventId: "prediction-event-announcements", slug: "frieren-official-news-before-2027", en: ["Will Frieren receive a new official animation update before 2027?", "Resolve Yes only if an official production account or website publishes a new animation project update before the deadline."], zh: ["《葬送的芙莉蓮》會在 2027 年前公布新的動畫消息嗎？", "只有官方製作帳號或網站在截止前發布新的動畫企劃消息，才結算為 Yes。"], source: "https://frieren-anime.jp/", sourceLabel: "Official Frieren anime site", closesAt: "2026-12-31T14:00:00.000Z" },
-    { id: "prediction-market-dal-news", eventId: "prediction-event-announcements", slug: "date-a-live-animation-update-q1-2027", en: ["Will Date A Live publish a new animation update by March 2027?", "Resolve from the official Date A Live website or verified production account."], zh: ["《約會大作戰》會在 2027 年 3 月前發布新的動畫消息嗎？", "以《約會大作戰》官方網站或經驗證的製作帳號為結算來源。"], source: "https://date-a-live5th-anime.com/", sourceLabel: "Official Date A Live site", closesAt: "2027-03-31T14:00:00.000Z" },
-    { id: "prediction-market-bangumi-threshold", eventId: "prediction-event-summer-2026", slug: "summer-title-bangumi-collection-threshold", en: ["Will the featured summer title reach the published Bangumi collection threshold?", "Resolve using the captured Bangumi subject total at 23:00 Hong Kong time on the deadline."], zh: ["本季焦點作品會達到指定的 Bangumi 收藏門檻嗎？", "以截止日香港時間 23:00 保存的 Bangumi 條目收藏數快照結算。"], source: "https://bangumi.tv/anime/tag/2026%E5%A4%8F", sourceLabel: "Bangumi 2026 summer index", closesAt: "2026-10-31T15:00:00.000Z" },
+    { id: "prediction-market-frieren-news", eventId: "prediction-event-announcements", slug: "frieren-official-news-before-2027", en: ["Will the Frieren site announce a third TV anime season before 2027?", "Yes only for a dated announcement on frieren-anime.jp explicitly confirming production of TV season 3, published from 2026-11-01 00:00 through 2026-12-31 23:59:59 Asia/Hong_Kong. Trailers, rebroadcasts, films, and season 2 updates do not count. Otherwise No."], zh: ["芙莉蓮官網會在 2027 年前宣布製作電視動畫第三季嗎？", "僅計 frieren-anime.jp 於香港時間 2026-11-01 00:00 至 2026-12-31 23:59:59 發布並明確確認製作電視動畫第三季的公告。預告、重播、電影及第二季消息不計；否則為 No。"], source: "https://frieren-anime.jp/", sourceLabel: "Official Frieren anime site", closesAt: "2026-12-31T16:00:00.000Z" },
+    { id: "prediction-market-dal-news", eventId: "prediction-event-announcements", slug: "date-a-live-animation-update-q1-2027", en: ["Will the Date A Live site announce TV season 6 by April 2027?", "Yes only for a dated announcement on date-a-live5th-anime.com explicitly confirming production of TV season 6, published from 2026-11-01 00:00 through 2027-03-31 23:59:59 Asia/Hong_Kong. Films, games, merchandise, and rebroadcasts do not count. Otherwise No."], zh: ["約會大作戰官網會在 2027 年 4 月前宣布電視動畫第六季嗎？", "僅計 date-a-live5th-anime.com 於香港時間 2026-11-01 00:00 至 2027-03-31 23:59:59 明確確認製作電視動畫第六季的公告。電影、遊戲、商品和重播不計；否則為 No。"], source: "https://date-a-live5th-anime.com/", sourceLabel: "Official Date A Live site", closesAt: "2027-03-31T16:00:00.000Z" },
   ] as const;
-  const reservePerMarket = Math.ceil(100 * 20 * Math.log(2));
   for (const marketData of predictionMarkets) {
-    const market = await db.predictionMarket.upsert({
-      where: { slug: marketData.slug },
-      create: { id: marketData.id, eventId: marketData.eventId, slug: marketData.slug, question: marketData.en[0], description: marketData.en[1], status: "OPEN", resolutionSourceUrl: marketData.source, resolutionSourceLabel: marketData.sourceLabel, edgeCaseRules: "If the source is unavailable or the wording cannot be resolved objectively, void and refund the market.", closesAt: new Date(marketData.closesAt), reservedLiability: reservePerMarket },
-      update: { question: marketData.en[0], description: marketData.en[1], resolutionSourceUrl: marketData.source, resolutionSourceLabel: marketData.sourceLabel, closesAt: new Date(marketData.closesAt), reservedLiability: reservePerMarket },
+    // Existing rules, supply, status and reserves are immutable to the bootstrap.
+    if (await db.predictionMarket.findFirst({ where: { OR: [{ slug: marketData.slug }, { id: marketData.id }] } })) continue;
+    const market = await db.predictionMarket.create({
+      data: { id: marketData.id, eventId: eventIds.get(marketData.eventId)!, slug: marketData.slug, question: marketData.en[0], description: marketData.en[1], status: "DRAFT", resolutionSourceUrl: marketData.source, resolutionSourceLabel: marketData.sourceLabel, edgeCaseRules: "Draft template: an administrator must verify the source and capture a baseline before opening. Missing or conflicting dated evidence at resolution means Void; postponement does not extend the deadline.", closesAt: new Date(marketData.closesAt), reservedLiability: 0 },
     });
     for (const [locale, copy, edgeCaseRules] of [["EN", marketData.en, "If the source is unavailable or the wording cannot be resolved objectively, void and refund the market."], ["ZH_HANT", marketData.zh, "若來源無法存取或問題不能客觀判定，市場作廢並退款。"]] as const) {
       await db.predictionMarketLocale.upsert({ where: { marketId_locale: { marketId: market.id, locale } }, create: { marketId: market.id, locale, question: copy[0], description: copy[1], edgeCaseRules }, update: { question: copy[0], description: copy[1], edgeCaseRules } });
@@ -241,16 +245,30 @@ async function seedV3Experience(db: SeedClient, snapshot: SeedSnapshot) {
       await db.predictionOutcome.upsert({ where: { marketId_key: { marketId: market.id, key } }, create: { marketId: market.id, key, label }, update: { label } });
     }
     await db.oracleSource.upsert({ where: { id: `${market.id}-oracle` }, create: { id: `${market.id}-oracle`, marketId: market.id, label: marketData.sourceLabel, url: marketData.source, priority: 1 }, update: { label: marketData.sourceLabel, url: marketData.source } });
-    await db.predictionRuleVersion.upsert({ where: { marketId_version: { marketId: market.id, version: 1 } }, create: { marketId: market.id, version: 1, snapshot: { question: marketData.en[0], source: marketData.source, closesAt: marketData.closesAt } }, update: {} });
+    await db.predictionRuleVersion.upsert({ where: { marketId_version: { marketId: market.id, version: 1 } }, create: { marketId: market.id, version: 1, snapshot: { question: market.question, description: market.description, edgeCaseRules: market.edgeCaseRules, resolutionSourceUrl: market.resolutionSourceUrl, resolutionSourceLabel: market.resolutionSourceLabel, timezone: market.timezone, closesAt: marketData.closesAt } }, update: {} });
   }
   await db.predictionTreasury.upsert({
     where: { id: "system" },
-    create: { id: "system", balance: 50_000, reserved: predictionMarkets.length * reservePerMarket },
-    update: { balance: 50_000, reserved: predictionMarkets.length * reservePerMarket },
+    create: { id: "system", balance: 50_000, reserved: 0 },
+    update: {},
   });
 }
 
-export async function seedDatabase(db: SeedClient = prisma, snapshot: SeedSnapshot = seedSnapshot) {
+export async function seedDatabase(db: typeof prisma = prisma, snapshot: SeedSnapshot = seedSnapshot) {
+  return db.$transaction(async (tx) => {
+    // Serialize bootstrap processes, including the emptiness check, without resetting user data.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(73421, 3)::text`;
+    const counts = await Promise.all([tx.user.count(), tx.character.count(), tx.series.count(), tx.predictionMarket.count()]);
+    if (counts.some((count) => count > 0)) {
+      await seedV3Experience(tx, snapshot, false);
+      return { mode: "upgraded" as const };
+    }
+    await seedFreshDatabase(tx, snapshot);
+    return { mode: "initialized" as const };
+  }, { maxWait: 10_000, timeout: 180_000 });
+}
+
+async function seedFreshDatabase(db: SeedClient, snapshot: SeedSnapshot) {
   for (const user of snapshot.users) {
     await db.user.upsert({
       where: { id: user.id },

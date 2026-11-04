@@ -17,6 +17,10 @@ export function SocialPostDetail({ note, comments, locale, signedIn, canModerate
   const [saved, setSaved] = useState(note.viewer.saved);
   const [saveCount, setSaveCount] = useState(note.counts.saves);
   const [status, setStatus] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("Unsafe or harmful content");
+  const [reportDetail, setReportDetail] = useState("");
+  const [reportPending, setReportPending] = useState(false);
 
   async function toggleSave() {
     setStatus("");
@@ -29,14 +33,20 @@ export function SocialPostDetail({ note, comments, locale, signedIn, canModerate
     setStatus(response.status === 401 ? (zh ? "登入後可以收藏到自己的書架。" : "Sign in to save this to your shelf.") : (zh ? "書架暫時沒有回應。" : "Your shelf did not respond yet."));
   }
 
-  async function reportPost() {
+  async function reportPost(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setStatus("");
-    const response = await fetch("/api/reports", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ postId: note.id, reason: "Community safety review" }),
-    });
-    setStatus(response.ok ? (zh ? "已送到管理員的審核桌。" : "Sent to the moderation desk.") : response.status === 401 ? (zh ? "登入後可以送出檢舉。" : "Sign in to send a report.") : (zh ? "暫時未能送出檢舉。" : "The report could not be sent."));
+    setReportPending(true);
+    try {
+      const response = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ postId: note.id, reason: reportReason, detail: reportDetail.trim() || undefined }),
+      });
+      setStatus(response.ok ? (zh ? "已送到管理員的審核桌。" : "Sent to the moderation desk.") : response.status === 401 ? (zh ? "登入後可以送出檢舉。" : "Sign in to send a report.") : (zh ? "暫時未能送出檢舉。" : "The report could not be sent."));
+      if (response.ok) { setReportOpen(false); setReportDetail(""); }
+    } catch { setStatus(zh ? "暫時未能送出檢舉。" : "The report could not be sent. Please retry."); }
+    finally { setReportPending(false); }
   }
 
   return (
@@ -48,7 +58,8 @@ export function SocialPostDetail({ note, comments, locale, signedIn, canModerate
           <h1>{note.title}</h1>
           <p>{note.body}</p>
           <div className="post-detail-byline"><span className="social-avatar">{note.author.displayName.charAt(0)}</span><div><strong>{note.author.displayName}</strong><small>@{note.author.handle}</small></div>{note.character ? <Link href={localePath(locale, `/character/${note.character.slug}`)}>{note.character.name}</Link> : null}</div>
-          <div className="post-detail-actions"><button type="button" onClick={toggleSave} className={saved ? "is-saved" : ""}><Bookmark />{saved ? (zh ? "已收藏" : "Saved") : (zh ? "收藏" : "Save")} · {saveCount}</button><ShareButton title={note.title} text={note.body} path={localePath(locale, `/posts/${note.slug}`)} locale={locale} /><button type="button" onClick={reportPost}><Flag />{zh ? "檢舉" : "Report"}</button></div>
+          <div className="post-detail-actions"><button type="button" onClick={toggleSave} className={saved ? "is-saved" : ""}><Bookmark />{saved ? (zh ? "已收藏" : "Saved") : (zh ? "收藏" : "Save")} · {saveCount}</button><ShareButton title={note.title} text={note.body} path={localePath(locale, `/posts/${note.slug}`)} locale={locale} /><button type="button" onClick={() => setReportOpen((open) => !open)} aria-expanded={reportOpen}><Flag />{zh ? "檢舉" : "Report"}</button></div>
+          {reportOpen ? <form onSubmit={reportPost} className="mt-4 grid gap-3 rounded-xl border border-slate-300 p-4"><label className="grid gap-1">{zh ? "檢舉原因" : "Report reason"}<select value={reportReason} onChange={(event) => setReportReason(event.target.value)} className="rounded border p-2"><option value="Unsafe or harmful content">{zh ? "有害或不安全內容" : "Unsafe or harmful content"}</option><option value="Harassment or hate">{zh ? "騷擾或仇恨" : "Harassment or hate"}</option><option value="Copyright or image rights">{zh ? "版權或圖片權利" : "Copyright or image rights"}</option><option value="Spam or misleading content">{zh ? "垃圾或誤導內容" : "Spam or misleading content"}</option></select></label><label className="grid gap-1">{zh ? "補充說明（選填）" : "Additional detail (optional)"}<textarea value={reportDetail} onChange={(event) => setReportDetail(event.target.value)} maxLength={500} className="rounded border p-2" /></label><button type="submit" disabled={reportPending} className="rounded border px-3 py-2 disabled:opacity-50">{reportPending ? (zh ? "傳送中" : "Sending...") : (zh ? "送出檢舉" : "Send report")}</button></form> : null}
           {status ? <p className="post-action-status" role="status">{status}</p> : null}
         </div>
         <div className="post-detail-lead-visual" role="img" aria-label={note.media[0]?.altText ?? note.title} style={visualStyle(note.media[0]?.url ?? null, note.character?.accentFrom, note.character?.accentTo)}>{!note.media[0]?.url ? <strong>{note.character?.name.charAt(0) ?? "推"}</strong> : null}<span>{note.media[0]?.sourceLabel ?? (zh ? "社群筆記" : "Community note")}</span></div>

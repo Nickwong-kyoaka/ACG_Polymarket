@@ -1,20 +1,12 @@
 import { seedSnapshot } from "../src/data/seed";
-import { syncApprovedMedia } from "../src/lib/approved-media";
 import { prisma } from "../src/lib/prisma";
 import { seedDatabase } from "../src/lib/seed-db";
 
 async function main() {
-  const characterCount = await prisma.character.count();
-
-  if (characterCount === 0) {
-    await seedDatabase(prisma, seedSnapshot);
-    console.log(`Initialized a new database with ${seedSnapshot.characters.length} characters.`);
-    return;
-  }
-
-  const media = await syncApprovedMedia(prisma);
-  console.log(`Database already initialized with ${characterCount} characters; seed skipped.`);
-  console.log(JSON.stringify({ media }, null, 2));
+  const result = await seedDatabase(prisma, seedSnapshot);
+  console.log(result.mode === "initialized"
+    ? `Initialized a new database with ${seedSnapshot.characters.length} characters.`
+    : "Applied additive V3 reference data; existing accounts, content, rules, and balances preserved.");
 }
 
 main().catch((error) => {

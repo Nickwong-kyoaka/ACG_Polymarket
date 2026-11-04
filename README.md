@@ -10,9 +10,11 @@ Character support and event predictions are deliberately separate:
 
 ## Project status and roadmap
 
-V3 is partially complete. The route and architecture overview below describes the current foundation; some user flows still need to be connected or corrected before wider public testing.
+V3 now includes creator drafts and resubmission, collection shelves, creator-series subscriptions, watch journals, room settings, reviewed media intake, moderation appeals, and funded prediction-fee accounting. Live-service acceptance and additional content remain tracked separately.
 
 See [项目现状与发展路线图](PROJECT_STATUS_AND_ROADMAP.md) for the source audit dated 2026-11-03, implemented capabilities, known gaps, P0-P3 priorities, and acceptance criteria. The audit distinguishes historical verification from checks repeated on the audited code.
+
+The 2026-11-04 implementation update at the top of that document supersedes the original gap list. See [database upgrade notes](prisma/UPGRADE.md) before operating on an existing beta database.
 
 ## Stack
 
@@ -30,6 +32,9 @@ See [项目现状与发展路线图](PROJECT_STATUS_AND_ROADMAP.md) for the sour
 - `/predictions`, `/predictions/[slug]`, `/me/predictions`: source-led LMSR markets, signed quotes, position book, challenges, and resolution history
 - `/comfort`, `/shop`, `/work`: comfort stories and voices, unlockable cosmetics, missions, and timed work rewards
 - `/me`, `/me/notifications`: private player room, library, holdings, notifications, preferences, and public-profile controls
+- `/me/posts`, `/me/series`, `/me/collections`: server drafts, resubmission, creator chapters, subscriptions, and editable collection shelves
+- `/series/[slug]`, `/me/library`, `/search`: sourced title pages, episode progress, watch journals, and cross-catalog discovery
+- `/me/moderation`, `/admin/appeals`, `/admin/analytics`: member appeals, independent review, and sample-sized activity/retention reports
 - `/admin`: content, media, community, knowledge revisions, predictions, campaigns, takedowns, and reconciliation
 
 The seed catalog contains 24 published characters plus bilingual social notes, topics, episodes, prediction events, and coherent market history. Seed and bootstrap are explicit deployment operations; public requests never seed the database.
@@ -113,6 +118,10 @@ Optional media variables:
 
 `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PUBLIC_BASE_URL`, and `S3_FORCE_PATH_STYLE` are required only for durable uploads. Render's local filesystem is ephemeral, so public external media should use S3-compatible storage before launch.
 
+External post image intake additionally requires `S3_PRIVATE_BUCKET`, a separate non-public bucket that must not equal `S3_BUCKET`. Use the same configured S3 endpoint/credentials, with private-object read/write access. Operators must enforce privacy through bucket policies and provider access settings; the application checks that the bucket name is separate but does not verify its policy. Do not attach public bucket policies or a public CDN to this bucket; enable public-access blocking where supported and leave R2 public bucket URLs/custom domains disabled. Intake writes owner-bound normalized WebP objects under `post-media/` without object ACLs, for compatibility with R2 and bucket-owner-enforced S3 storage. Keep this bucket private after review too: `/api/post-media/:id` serves bytes only while the linked media is approved and its post is published, with no-store caching. Pending imagery is available only through the authenticated admin preview API.
+
+Set `NEXTAUTH_URL` (or `AUTH_URL` if `NEXTAUTH_URL` is unset) to the canonical HTTPS app origin for post media intake. Missing private storage or a non-HTTPS origin fails closed. Editors can retain their own existing pending/held post imagery by its stored media URL; the server checks ownership and normalization and reuses the database storage key without fetching the quarantined URL. Client-supplied storage keys and rejected/pulled media are not accepted.
+
 Render lifecycle:
 
 ```text
@@ -138,6 +147,15 @@ Health: /api/health
 - Media pages with unverified assets use house/mock ad slots.
 
 ## Verification
+
+Tests never use your normal `DATABASE_URL`. Set `TEST_DATABASE_URL` explicitly to a disposable database whose name contains `test` to enable database integration tests and Playwright. Without it, database integration tests are skipped. Browser tests validate this variable, apply migrations, and bootstrap only that test connection automatically:
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+GitHub Actions configures its own Postgres test database. Local Docker is optional when another isolated Postgres instance is available. Use a fresh disposable test database for browser fixtures; this setup never resets an existing database.
 
 ```bash
 npx prisma validate

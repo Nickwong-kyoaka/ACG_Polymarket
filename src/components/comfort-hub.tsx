@@ -3,6 +3,7 @@ import Image from "next/image";
 import { ArrowRight, HeartHandshake, MoonStar } from "lucide-react";
 import { localePath, pick, type PublicLocale } from "@/components/acg-locale";
 import type { ComfortContent, ComfortMode } from "@/lib/types";
+import type { ComfortMediaView } from "@/components/room-media.server";
 
 type ModeTranslation = { title: string; subtitle: string; description: string; promptLabel: string; tag: string };
 
@@ -33,21 +34,14 @@ const modeTranslations: Record<string, Record<PublicLocale, ModeTranslation>> = 
   },
 };
 
-const contentTranslations: Record<string, Record<PublicLocale, { title: string; body: string }>> = {
-  "comfort-akari-lonely-talk": { en: { title: "Akari saves you a front-row seat", body: "You made it here, and that already counts. Sit with me for one song; no one has to shine alone tonight." }, "zh-Hant": { title: "明里替你留下第一排的位置", body: "你能走到這裡已經很了不起。陪我聽完一首歌吧，今晚沒有人需要獨自發光。" } },
-  "comfort-ren-sleep-asmr": { en: { title: "Ren's midnight metronome", body: "Four beats in, six beats out. Let the rhythm close the day for you." }, "zh-Hant": { title: "蓮的午夜節拍器", body: "吸氣四拍，吐氣六拍。讓節奏替你把今天輕輕合上。" } },
-  "comfort-mira-study-comic": { en: { title: "Three-panel snack break", body: "Mira steals the textbook, covers it in heart-shaped notes, and returns only one tiny task." }, "zh-Hant": { title: "米菈的點心休息漫畫", body: "米菈先搶走課本，貼滿心形便條，再只還給你一件很小、可以完成的任務。" } },
-  "comfort-tohka-confidence-talk": { en: { title: "Tohka believes the obvious thing", body: "If you are still trying, you have not lost. Eat something warm, stand again, and let me cheer loudly." }, "zh-Hant": { title: "十香相信最直接的答案", body: "你還在努力，就不算輸。先吃一點溫暖的東西，再站起來，讓我大聲替你加油！" } },
-  "comfort-kurumi-heartbreak-voice": { en: { title: "Kurumi's velvet reset", body: "Your heart is not foolish for wanting to be loved. Rest here before choosing the next hour." }, "zh-Hant": { title: "狂三的絲絨重置", body: "想被愛的心並不愚蠢。在決定下一個小時以前，先在這裡休息吧。" } },
-  "comfort-shiori-stress-wallpaper": { en: { title: "Archive breathing wallpaper", body: "A rights-safe gradient archive made for slower breathing and calmer dashboards." }, "zh-Hant": { title: "檔案館呼吸壁紙", body: "以可安全使用的原創漸層構成，讓呼吸與玩家房間都慢下來。" } },
-};
 
 export function localizeComfortMode(mode: ComfortMode, locale: PublicLocale): ComfortMode & { tag: string } {
   return { ...mode, ...(modeTranslations[mode.slug]?.[locale] ?? {}), tag: modeTranslations[mode.slug]?.[locale].tag ?? "Comfort" };
 }
 
 export function localizeComfortContent(content: ComfortContent, locale: PublicLocale): ComfortContent {
-  return { ...content, ...(contentTranslations[content.id]?.[locale] ?? {}) };
+  void locale;
+  return content;
 }
 
 export function ComfortNotice({ locale }: { locale: PublicLocale }) {
@@ -59,7 +53,9 @@ export function ComfortModeCard({ mode, locale }: { mode: ComfortMode; locale: P
   return <Link href={localePath(locale, `/comfort/${mode.slug}`)} className="exchange-panel group flex min-h-80 flex-col p-6 transition hover:-translate-y-1" style={{ background: `radial-gradient(circle at 90% 10%, ${mode.accentTo}55, transparent 38%), rgba(255,253,247,.92)` }}><div className="flex items-start justify-between"><span className="grid h-12 w-12 place-items-center rounded-[16px_4px_16px_4px] text-white" style={{ background: mode.accentFrom }}><MoonStar className="h-6 w-6" /></span><span className="rounded-full bg-[#111827] px-3 py-1 text-[9px] font-black uppercase tracking-[.18em] text-white">{localized.tag}</span></div><p className="mt-8 text-[10px] font-black uppercase tracking-[.2em] text-[#e83c62]">{localized.subtitle}</p><h3 className="mt-2 font-display text-4xl leading-none">{localized.title}</h3><p className="mt-4 text-sm leading-7 text-slate-600">{localized.description}</p><span className="mt-auto inline-flex items-center gap-2 pt-6 text-sm font-black text-slate-800">{pick(locale, "Enter room", "進入房間")}<ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span></Link>;
 }
 
-export function MiniComic({ mode, locale }: { mode: ComfortMode; locale: PublicLocale }) {
+export function MiniComic({ mode, locale, media }: { mode: ComfortMode; locale: PublicLocale; media?: ComfortMediaView }) {
+  if (media?.panels.length) return <div className="grid gap-4 sm:grid-cols-2">{media.panels.map((panel) => <figure key={panel.id} className="exchange-panel overflow-hidden"><Image src={panel.imageUrl} alt={panel.altText} width={800} height={800} className="h-auto w-full" unoptimized />{panel.caption ? <figcaption className="p-4 text-sm leading-7 text-slate-600">{panel.caption}</figcaption> : null}</figure>)}</div>;
+  if (media?.comic) return <figure className="exchange-panel overflow-hidden"><Image src={media.comic.url} alt={media.comic.alt} width={1600} height={900} className="h-auto w-full" unoptimized /><figcaption className="p-4 text-xs text-slate-500">{media.comic.label}</figcaption></figure>;
   const title = localizeComfortMode(mode, locale).title;
   const panels = locale === "zh-Hant" ? [
     `門上的「${title}」燈牌亮起。`,
@@ -72,5 +68,5 @@ export function MiniComic({ mode, locale }: { mode: ComfortMode; locale: PublicL
     "One gentle line lands on the desk with your name on it.",
     "The final panel leaves a warm light on for tomorrow.",
   ];
-  return <figure className="exchange-panel overflow-hidden bg-[#111827]"><Image src={`/assets/comfort/comfort-four-panel-${locale}.svg`} alt={locale === "zh-Hant" ? "原創四格安慰漫畫：走進房間、降低雜音、收到溫柔訊息，最後把明天留給明天。" : "Original four-panel comfort comic about entering, quieting the noise, receiving kindness, and leaving tomorrow for tomorrow."} width={1600} height={900} className="h-auto w-full" unoptimized /><figcaption className="sr-only">{panels.join(" ")}</figcaption></figure>;
+  return <figure className="exchange-panel overflow-hidden bg-[#111827]"><Image src={`/assets/comfort/comfort-four-panel-${locale}.svg`} alt={locale === "zh-Hant" ? "原創四格安慰漫畫：走進房間、降低雜音、收到溫柔訊息，最後把明天留給明天。" : "Original four-panel comfort comic about entering, quieting the noise, receiving kindness, and leaving tomorrow for tomorrow."} width={1600} height={900} className="h-auto w-full" unoptimized /><figcaption className="p-4 text-xs text-white/70">{pick(locale, "Original fallback comic · not a character-specific commission", "原創備用漫畫 · 非角色專屬委託作品")}<span className="sr-only">{panels.join(" ")}</span></figcaption></figure>;
 }

@@ -94,7 +94,7 @@ export default async function PredictionDetailPage({ params, searchParams }: { p
         <div className="border-l border-[#2c2724]/25 pl-6"><p className="text-sm leading-8 text-[#716862]">{zh ? "截止後管理員依票面來源提出 Yes、No 或作廢。接著保留 24 小時讓有證據的挑戰進場；有有效爭議時，由第二名管理員確認，無法客觀判定則退回相關 SUP。" : "After close, an administrator proposes Yes, No, or Void from the listed source. A 24-hour evidence challenge follows; a valid dispute requires a second reviewer, while an objectively unresolved question is voided and refunded."}</p><p className="mt-4 text-xs font-bold text-[#2c2724]">{zh ? `每份勝出結算 ${market.payoutPerShare} SUP。` : `Each winning share settles at ${market.payoutPerShare} SUP.`}</p></div>
       </section>
 
-      {activeProposal?.outcome ? <PredictionChallengePanel marketSlug={market.slug} proposalId={activeProposal.id} outcome={activeProposal.outcome.label} challengeOpen={market.status === "PROPOSED" || market.status === "CHALLENGE"} challenges={activeProposal.challenges} signedIn={Boolean(session?.user?.id)} locale={locale} /> : null}
+      {market.resolutionProposals.filter((proposal) => proposal.outcome).map((proposal) => <PredictionChallengePanel key={proposal.id} marketSlug={market.slug} proposalId={proposal.id} outcome={`${proposal.outcome!.label} (${proposal.status})`} challengeOpen={proposal.id === activeProposal?.id && ["PROPOSED", "CHALLENGE"].includes(market.status) && new Date(proposal.challengeEndsAt) > new Date()} challenges={proposal.challenges} signedIn={Boolean(session?.user?.id)} locale={locale} />)}
 
       <PostConversation predictionMarketId={market.id} initialComments={comments} locale={locale} signedIn={Boolean(session?.user?.id)} canModerate={false} context="prediction" />
     </div>

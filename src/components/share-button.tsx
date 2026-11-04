@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Share2 } from "lucide-react";
 import type { PublicLocale } from "@/components/acg-locale";
+import { trackEngagement } from "@/lib/client-analytics";
 
 export function ShareButton({ title, text, path, locale, compact = false }: { title: string; text: string; path: string; locale: PublicLocale; compact?: boolean }) {
   const [copied, setCopied] = useState(false);
@@ -11,10 +12,13 @@ export function ShareButton({ title, text, path, locale, compact = false }: { ti
 
   async function share() {
     setFailed(false);
-    const url = new URL(path, window.location.origin).toString();
+    const sharedUrl = new URL(path, window.location.origin);
+    sharedUrl.searchParams.set("ref", "share");
+    const url = sharedUrl.toString();
     if (navigator.share) {
       try {
         await navigator.share({ title, text, url });
+        trackEngagement("SHARE", locale, path, { method: "native" });
         return;
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
@@ -22,6 +26,7 @@ export function ShareButton({ title, text, path, locale, compact = false }: { ti
     }
     try {
       await navigator.clipboard.writeText(url);
+      trackEngagement("SHARE", locale, path, { method: "clipboard" });
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {

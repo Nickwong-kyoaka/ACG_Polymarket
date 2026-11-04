@@ -1,4 +1,66 @@
 import type { CharacterAsset } from "@/lib/types";
+import type { Prisma } from "@prisma/client";
+
+export const publicAssetWhere = {
+  workflowStatus: "PUBLISHED" as const,
+  contentRating: "SFW" as const,
+  permissionStatus: { notIn: ["REJECTED", "TAKEDOWN_REQUESTED"] },
+} satisfies Prisma.CharacterAssetWhereInput;
+
+export function isPublicAsset(asset: { workflowStatus?: string; permissionStatus?: string | null; contentRating?: string | null }) {
+  return asset.workflowStatus === "PUBLISHED" &&
+    !["REJECTED", "TAKEDOWN_REQUESTED"].includes(asset.permissionStatus ?? "") &&
+    (asset.contentRating === undefined || asset.contentRating === "SFW");
+}
+
+export function safePublicMediaUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (/^\/assets\/[A-Za-z0-9_/-]+(?:\.[A-Za-z0-9]+)?$/.test(value) && !value.includes("..")) return value;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+
+export function renderPublicAsset(asset: {
+  publicUrl: string | null;
+  storageKey: string;
+  derivatives?: Array<{ kind: string; publicUrl: string; width?: number; height?: number }>;
+}) {
+  const derivatives = asset.derivatives ?? [];
+  const ordered = [
+    ...derivatives.filter((item) => item.kind === "CARD"),
+    ...derivatives.filter((item) => item.kind === "HERO"),
+    ...derivatives,
+  ];
+  for (const item of ordered) {
+    const url = safePublicMediaUrl(item.publicUrl);
+    if (url) return { url, width: item.width ?? null, height: item.height ?? null };
+  }
+  const url = safePublicMediaUrl(asset.publicUrl) ?? safePublicMediaUrl(`/${asset.storageKey}`);
+  return url ? { url, width: null, height: null } : null;
+}
+
+// A linked asset must never fall back to a stale, copied PostMedia URL.
+export const publicPostMediaWhere = {
+  status: "APPROVED" as const,
+  OR: [{ assetId: null }, { asset: { is: publicAssetWhere } }],
+} satisfies Prisma.PostMediaWhereInput;
+
+export function renderPublicPostMedia(media: {
+  status?: string;
+  assetId?: string | null;
+  publicUrl: string | null;
+  storageKey: string | null;
+  asset?: (Parameters<typeof renderPublicAsset>[0] & Parameters<typeof isPublicAsset>[0]) | null;
+}) {
+  if (media.status !== "APPROVED") return null;
+  if (media.assetId || media.asset) {
+    return media.asset && isPublicAsset(media.asset) ? renderPublicAsset(media.asset) : null;
+  }
+  const url = safePublicMediaUrl(media.publicUrl) ?? safePublicMediaUrl(media.storageKey ? `/${media.storageKey}` : null);
+  return url ? { url, width: null, height: null } : null;
+}
 
 export type PublicCharacterAsset = Pick<
   CharacterAsset,
@@ -8,13 +70,11 @@ export type PublicCharacterAsset = Pick<
 const visualKinds = ["HERO", "CARD", "THUMB", "WALLPAPER"] as const;
 
 export function publicAssetUrl(asset: Pick<CharacterAsset, "publicUrl" | "storageKey">) {
-  if (asset.publicUrl?.startsWith("https://")) return asset.publicUrl;
-  if (asset.storageKey.startsWith("assets/")) return `/${asset.storageKey}`;
-  return undefined;
+  return safePublicMediaUrl(asset.publicUrl) ?? safePublicMediaUrl(`/${asset.storageKey}`) ?? undefined;
 }
 
 export function toPublicAsset(asset: CharacterAsset): PublicCharacterAsset | undefined {
-  if (asset.workflowStatus !== "PUBLISHED") return undefined;
+  if (!isPublicAsset(asset)) return undefined;
   const renderedUrl = publicAssetUrl(asset);
   if (!renderedUrl) return undefined;
   return {

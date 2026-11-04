@@ -10,7 +10,7 @@ import { requestMarketQuote } from "@/lib/market-quote";
 import { prisma } from "@/lib/prisma";
 import { buySupport, sellSupport } from "@/lib/store";
 
-const runDatabaseTests = Boolean(process.env.DATABASE_URL);
+const runDatabaseTests = Boolean(process.env.TEST_DATABASE_URL);
 
 describe.skipIf(!runDatabaseTests)("market transaction integration", () => {
   const suffix = randomUUID().slice(0, 8);

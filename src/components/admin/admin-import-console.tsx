@@ -1,9 +1,10 @@
 "use client";
 
 import type { FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CheckCircle2, ExternalLink, FileInput, LibraryBig, LoaderCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, LibraryBig } from "lucide-react";
 import type { BangumiImportSample } from "@/data/bangumi-samples";
 import type { SourceAttribution } from "@/lib/types";
 import {
@@ -16,89 +17,60 @@ import {
   postAdmin,
 } from "@/components/admin/admin-ui";
 
-const stableSampleNames: Record<string, string> = {
-  "49131": "Date A Live / 約會大作戰",
-  "summer-2026-bangumi": "Bangumi 2026 Summer Watchlist / 2026 夏季番",
-};
-
-function SampleQueue({ samples }: { samples: BangumiImportSample[] }) {
+function LiveSubjectImport({ samples }: { samples: BangumiImportSample[] }) {
   const router = useRouter();
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [subjectId, setSubjectId] = useState("");
+  const [pending, setPending] = useState(false);
+  const [includeSummary, setIncludeSummary] = useState(false);
   const [notice, setNotice] = useState<AdminNotice>(null);
+  const [result, setResult] = useState<{ seriesId: string; proposalId: string | null; snapshot: { id: string; checksum: string }; warnings: string[]; episodes: { count: number; total: number } | null } | null>(null);
 
-  async function importSubject(subjectId: string) {
-    setPendingId(subjectId);
+  async function importSubject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setPending(true);
     setNotice(null);
+    setResult(null);
     try {
-      const result = await postAdmin<{ imported: number }>("/api/admin/bangumi/import-subject", {
-        subjectId,
+      const imported = await postAdmin<NonNullable<typeof result>>("/api/admin/bangumi/import-subject", {
+        subjectId: subjectId.trim(),
+        seriesId: String(data.get("seriesId") ?? "").trim() || undefined,
+        includeEpisodes: data.get("includeEpisodes") === "on",
+        includeSummary,
+        ...(includeSummary ? { licenseName: String(data.get("licenseName")), attributionText: String(data.get("attributionText")), originalAuthor: String(data.get("originalAuthor")) } : {}),
       });
+      setResult(imported);
       setNotice({
         tone: "success",
-        message: `Imported ${result.imported} configured character record(s) from subject ${subjectId}.`,
+        message: imported.proposalId ? "Raw evidence saved. Differences are staged for the knowledge desk; existing catalog fields were not overwritten." : "Raw evidence saved. No catalog differences need review.",
       });
       router.refresh();
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "Sample import failed.",
+        message: error instanceof Error ? error.message : "Bangumi import failed.",
       });
     } finally {
-      setPendingId(null);
+      setPending(false);
     }
   }
 
   return (
     <AdminSectionCard
-      title="Curated subject queue"
-      description="These beta imports are configured server-side. They create metadata records and preserve the source URL without downloading official character media."
+      title="Live Bangumi subject intake"
+      description="Fetch any numeric subject ID from Bangumi, preserve raw evidence, and stage sourced changes for review. Metadata-only by default; no images, episodes, or translations are auto-published."
       accent="cyan"
     >
-      <div className="grid gap-4">
-        {samples.map((sample) => (
-          <article key={sample.subjectId} className="rounded-[1.5rem] border border-[#171126]/10 bg-[#fffaf4] p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-[#171126] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">
-                    Subject {sample.subjectId}
-                  </span>
-                  <span className="rounded-full bg-[#e9f7ff] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#1659a9]">
-                    {sample.releaseSeason}
-                  </span>
-                </div>
-                <h3 className="mt-3 font-display text-2xl text-[#171126]">
-                  {stableSampleNames[sample.subjectId] ?? sample.subjectTitle}
-                </h3>
-                <p className="mt-2 text-sm text-slate-500">
-                  {sample.characters.length} configured character signal(s)
-                  {typeof sample.score === "number" ? ` · Score snapshot ${sample.score}/100` : ""}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                <a
-                  href={sample.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#171126]/10 bg-white px-4 py-3 text-xs font-black text-slate-600 hover:border-[#38c7ff] hover:text-[#1659a9]"
-                >
-                  Source <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => importSubject(sample.subjectId)}
-                  disabled={pendingId !== null}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#171126] px-4 py-3 text-xs font-black text-white transition hover:bg-[#7c5cff] disabled:opacity-45"
-                >
-                  {pendingId === sample.subjectId ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileInput className="h-4 w-4" />}
-                  Import subject
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
+      <form onSubmit={importSubject} className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-2"><AdminField label="Numeric subject ID" required><input value={subjectId} onChange={(event) => setSubjectId(event.target.value)} inputMode="numeric" pattern="[1-9][0-9]{0,14}" placeholder="49131" required className={adminInputClass} /></AdminField><AdminField label="Existing series ID (optional)" hint="Leave blank to match its Bangumi source or create a metadata shell."><input name="seriesId" className={adminInputClass} /></AdminField></div>
+        <div className="flex flex-wrap gap-2">{samples.filter((sample) => /^[1-9][0-9]*$/.test(sample.subjectId)).map((sample) => <button key={sample.subjectId} type="button" onClick={() => setSubjectId(sample.subjectId)} className="rounded-xl border px-3 py-2 text-xs font-bold">Use example ID {sample.subjectId}</button>)}</div>
+        <label className="flex gap-2 text-sm"><input type="checkbox" name="includeEpisodes" />Snapshot first episode page (up to 100; evidence only)</label>
+        <label className="flex gap-2 text-sm"><input type="checkbox" checked={includeSummary} onChange={(event) => setIncludeSummary(event.target.checked)} />Propose original summary text with explicit license and attribution</label>
+        {includeSummary ? <div className="grid gap-4 rounded-xl bg-amber-50 p-4"><AdminField label="License name" required><input name="licenseName" maxLength={120} required className={adminInputClass} /></AdminField><AdminField label="Original author" required><input name="originalAuthor" maxLength={180} required className={adminInputClass} /></AdminField><AdminField label="Attribution statement" required><textarea name="attributionText" minLength={8} maxLength={1000} required className={adminInputClass} /></AdminField><p className="text-xs">The original-language name and summary are not English or Traditional Chinese translations. Rights are verified by the reviewer before approval.</p></div> : null}
+        <AdminSubmitButton pending={pending}>Fetch and stage for review</AdminSubmitButton>
+      </form>
       <AdminNoticeBar notice={notice} />
+      {result ? <div className="grid gap-2 rounded-xl bg-slate-50 p-4 text-sm"><p>Snapshot: <code>{result.snapshot.id}</code></p><p className="break-all font-mono text-xs">SHA-256: {result.snapshot.checksum}</p><p>Series: <code>{result.seriesId}</code></p>{result.proposalId ? <Link href="/admin/knowledge" className="font-bold underline">Review proposal {result.proposalId} at the knowledge desk</Link> : null}{result.episodes ? <p>Episode evidence: {result.episodes.count} of {result.episodes.total}; not published.</p> : null}{result.warnings.map((warning) => <p key={warning} className="text-amber-800">{warning}</p>)}</div> : null}
     </AdminSectionCard>
   );
 }
@@ -220,7 +192,7 @@ export function AdminImportConsole({
 }) {
   return (
     <div className="grid gap-7">
-      <SampleQueue samples={samples} />
+      <LiveSubjectImport samples={samples} />
       <CustomImportForm />
       <AdminSectionCard
         title="Attribution ledger"

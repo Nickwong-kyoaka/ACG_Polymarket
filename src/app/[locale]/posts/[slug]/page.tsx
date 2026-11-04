@@ -6,6 +6,7 @@ import { SocialPostDetail } from "@/components/social-post-detail";
 import type { SocialNote } from "@/components/social-note-types";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { publicPostMediaWhere, renderPublicPostMedia } from "@/lib/public-assets";
 
 export const dynamic = "force-dynamic";
 
@@ -13,23 +14,16 @@ function getOrigin() {
   return (process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
 }
 
-function renderedUrl(media: { publicUrl: string | null; storageKey: string; derivatives: Array<{ kind: string; publicUrl: string }> }) {
-  const derivative = media.derivatives.find((entry) => entry.kind === "HERO") ?? media.derivatives.find((entry) => entry.kind === "CARD") ?? media.derivatives[0];
-  if (derivative?.publicUrl) return derivative.publicUrl;
-  if (media.publicUrl?.startsWith("https://") || media.publicUrl?.startsWith("/")) return media.publicUrl;
-  return media.storageKey.startsWith("assets/") ? `/${media.storageKey}` : null;
-}
-
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }): Promise<Metadata> {
   const { locale, slug } = await params;
   const zh = locale === "zh-Hant";
   const post = await prisma.post.findFirst({
-    where: { slug, status: "PUBLISHED" },
-    select: { title: true, body: true, media: { where: { status: "APPROVED" }, orderBy: { sortOrder: "asc" }, take: 1, include: { asset: { select: { publicUrl: true, storageKey: true, derivatives: { select: { kind: true, publicUrl: true } } } } } } },
+    where: { slug, status: "PUBLISHED", publishedAt: { not: null } },
+    select: { title: true, body: true, media: { where: publicPostMediaWhere, orderBy: { sortOrder: "asc" }, include: { asset: { select: { workflowStatus: true, permissionStatus: true, contentRating: true, publicUrl: true, storageKey: true, derivatives: { select: { kind: true, publicUrl: true } } } } } } },
   }).catch(() => null);
-  if (!post) return { title: zh ? "社群筆記" : "Clubroom note" };
+  if (!post) return { title: zh ? "社群筆記" : "Clubroom note", robots: { index: false, follow: false } };
   const path = `/${zh ? "zh-Hant" : "en"}/posts/${slug}`;
-  const rawImage = post.media[0]?.publicUrl ?? (post.media[0]?.asset ? renderedUrl(post.media[0].asset) : null);
+  const rawImage = post.media.flatMap((media) => { const rendered = renderPublicPostMedia(media); return rendered ? [rendered.url] : []; })[0];
   const image = rawImage ? (rawImage.startsWith("http") ? rawImage : `${getOrigin()}${rawImage}`) : `${getOrigin()}${path}/opengraph-image`;
   const description = post.body.replace(/\s+/g, " ").slice(0, 155);
   return {
@@ -47,16 +41,16 @@ export default async function PostPage({ params }: { params: Promise<{ locale: s
   const locale = rawLocale;
   const dbLocale = locale === "zh-Hant" ? "ZH_HANT" : "EN";
   const post = await prisma.post.findFirst({
-    where: { slug, status: "PUBLISHED" },
+    where: { slug, status: "PUBLISHED", publishedAt: { not: null } },
     include: {
       author: { select: { id: true, name: true, image: true, profile: { select: { handle: true, displayName: true } } } },
       primaryCharacter: { select: { id: true, slug: true, name: true, title: true, accentFrom: true, accentTo: true, locales: { select: { locale: true, name: true, title: true } } } },
       series: { select: { id: true, slug: true, title: true, locales: { select: { locale: true, title: true } } } },
-      media: { where: { status: "APPROVED" }, orderBy: { sortOrder: "asc" }, include: { asset: { select: { publicUrl: true, storageKey: true, altText: true, sourceLabel: true, sourceUrl: true, locales: { select: { locale: true, altText: true } }, derivatives: { select: { kind: true, publicUrl: true } } } } } },
+      media: { where: publicPostMediaWhere, orderBy: { sortOrder: "asc" }, include: { asset: { select: { workflowStatus: true, permissionStatus: true, contentRating: true, publicUrl: true, storageKey: true, altText: true, sourceLabel: true, sourceUrl: true, locales: { select: { locale: true, altText: true } }, derivatives: { select: { kind: true, publicUrl: true } } } } } },
       topics: { include: { topic: { include: { locales: true } } } },
       comments: { where: { status: "VISIBLE", parentId: null }, orderBy: [{ pinnedByAuthor: "desc" }, { createdAt: "desc" }], take: 40, include: { user: { select: { name: true, profile: { select: { displayName: true, handle: true } } } }, replies: { where: { status: "VISIBLE" }, orderBy: { createdAt: "asc" }, take: 20, include: { user: { select: { name: true, profile: { select: { displayName: true, handle: true } } } } } } } },
       saves: { where: { userId: session?.user?.id ?? "anonymous" }, take: 1 },
-      _count: { select: { saves: true, reactions: true, comments: true } },
+      _count: { select: { saves: true, reactions: true, comments: { where: { status: "VISIBLE" } } } },
     },
   }).catch(() => null);
   if (!post) notFound();
@@ -74,7 +68,7 @@ export default async function PostPage({ params }: { params: Promise<{ locale: s
     author: { id: post.author.id, handle: post.author.profile?.handle ?? "acg-desk", displayName: post.author.profile?.displayName ?? post.author.name ?? (locale === "zh-Hant" ? "ACG 編輯桌" : "ACG Exchange Desk"), imageUrl: post.author.image },
     character: post.primaryCharacter ? { id: post.primaryCharacter.id, slug: post.primaryCharacter.slug, name: characterLocale?.name ?? post.primaryCharacter.name, title: characterLocale?.title ?? post.primaryCharacter.title, accentFrom: post.primaryCharacter.accentFrom, accentTo: post.primaryCharacter.accentTo } : null,
     series: post.series ? { id: post.series.id, slug: post.series.slug, title: seriesLocale?.title ?? post.series.title } : null,
-    media: post.media.map((entry) => { const localized = entry.asset?.locales.find((copy) => copy.locale === dbLocale); return { id: entry.id, url: entry.publicUrl ?? (entry.asset ? renderedUrl(entry.asset) : null), altText: entry.altText || localized?.altText || entry.asset?.altText || post.title, sourceLabel: entry.sourceLabel ?? entry.asset?.sourceLabel ?? null, sourceUrl: entry.sourceUrl ?? entry.asset?.sourceUrl ?? null }; }),
+    media: post.media.flatMap((entry) => { const rendered = renderPublicPostMedia(entry); if (!rendered) return []; const localized = entry.asset?.locales.find((copy) => copy.locale === dbLocale); return [{ id: entry.id, url: rendered.url, altText: entry.altText || localized?.altText || entry.asset?.altText || post.title, sourceLabel: entry.sourceLabel ?? entry.asset?.sourceLabel ?? null, sourceUrl: entry.sourceUrl ?? entry.asset?.sourceUrl ?? null }]; }),
     topics: post.topics.map(({ topic }) => { const localized = topic.locales.find((entry) => entry.locale === dbLocale); return { slug: topic.slug, title: localized?.title ?? topic.title }; }),
     counts: { saves: post._count.saves, reactions: post._count.reactions, comments: post._count.comments },
     viewer: { saved: post.saves.length > 0, followingAuthor: false, followingCharacter: false },

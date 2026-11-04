@@ -21,18 +21,19 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: acg_polymarket
+          POSTGRES_DB: acg_polymarket_test
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d acg_polymarket"
+          --health-cmd "pg_isready -U postgres -d acg_polymarket_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/acg_polymarket?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/acg_polymarket_test?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/acg_polymarket_test?schema=public
       AUTH_SECRET: ci-auth-secret
       NEXTAUTH_SECRET: ci-auth-secret
       NEXTAUTH_URL: http://localhost:3000
@@ -60,3 +61,5 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

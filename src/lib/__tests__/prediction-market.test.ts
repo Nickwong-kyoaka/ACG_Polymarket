@@ -8,6 +8,7 @@ import {
   calculatePredictionQuote,
   calculateVoidRefunds,
   createSignedPredictionQuote,
+  effectivePredictionStatus,
   verifySignedPredictionQuote,
 } from "@/lib/prediction-market";
 
@@ -77,6 +78,31 @@ describe("V3 LMSR prediction market", () => {
         quantity: 1,
       }),
     ).toThrowError(expect.objectContaining({ code: "INVALID_SUPPLY", status: 422 }));
+  });
+
+  it.each([80, 100, 1000])("rejects sells whose gross cannot cover the fee (opposite supply %i)", (noShares) => {
+    expect(() => calculatePredictionQuote({
+      market: { ...emptyMarket, yesShares: 1, noShares }, outcome: "YES", side: "SELL", quantity: 1,
+    })).toThrowError(expect.objectContaining({ code: "SELL_BELOW_FEE", status: 422 }));
+  });
+
+  it("reconciles conservative round-trip principal and burned fees", () => {
+    const buy = calculatePredictionQuote({ market: emptyMarket, outcome: "YES", side: "BUY", quantity: 1 });
+    const sell = calculatePredictionQuote({ market: { ...emptyMarket, yesShares: 1 }, outcome: "YES", side: "SELL", quantity: 1 });
+    const walletDelta = -buy.netAmount + sell.netAmount;
+    const treasuryDelta = buy.grossAmount - sell.grossAmount;
+    expect(walletDelta).toBe(-4);
+    expect(treasuryDelta).toBe(1);
+    expect(walletDelta + treasuryDelta).toBe(-buy.feeAmount - sell.feeAmount);
+  });
+
+  it("treats an expired OPEN market as locked at the exact deadline, without changing terminal states", () => {
+    const closesAt = new Date("2026-01-01T00:00:00Z");
+    expect(effectivePredictionStatus({ status: "OPEN", closesAt }, new Date(closesAt.getTime() - 1))).toBe("OPEN");
+    expect(effectivePredictionStatus({ status: "OPEN", closesAt }, closesAt)).toBe("LOCKED");
+    for (const status of ["DRAFT", "LOCKED", "PROPOSED", "CHALLENGE", "RESOLVED", "VOID"]) {
+      expect(effectivePredictionStatus({ status, closesAt }, closesAt)).toBe(status);
+    }
   });
 
   it("signs a user, outcome, inventory, and market version for exactly 30 seconds", () => {

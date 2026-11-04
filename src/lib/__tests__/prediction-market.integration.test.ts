@@ -11,12 +11,13 @@ import {
   openPredictionMarket,
   proposePredictionResolution,
   requestPredictionQuote,
+  reviewPredictionChallenge,
   sellPredictionShares,
   updatePredictionMarketRules,
   voidPredictionMarket,
 } from "@/lib/prediction-market";
 
-const runDatabaseTests = Boolean(process.env.DATABASE_URL);
+const runDatabaseTests = Boolean(process.env.TEST_DATABASE_URL);
 
 describe.skipIf(!runDatabaseTests)("V3 prediction transaction integration", () => {
   const suffix = randomUUID().slice(0, 8);
@@ -104,6 +105,7 @@ describe.skipIf(!runDatabaseTests)("V3 prediction transaction integration", () =
   });
 
   it("executes and replays trades, rejects stale quotes, and reconciles ledger balances", async () => {
+    const treasuryStart = await prisma.predictionTreasury.findUniqueOrThrow({ where: { id: "system" } });
     const firstQuote = await requestPredictionQuote({
       identifier: marketSlug,
       outcome: "YES",
@@ -204,6 +206,14 @@ describe.skipIf(!runDatabaseTests)("V3 prediction transaction integration", () =
     expect(market.yesShares).toBe(1);
     expect(position.shares).toBe(1);
     expect(await prisma.predictionTrade.count({ where: { marketId: market.id } })).toBe(3);
+    const trades = await prisma.predictionTrade.findMany({ where: { marketId: market.id } });
+    const treasury = await prisma.predictionTreasury.findUniqueOrThrow({ where: { id: "system" } });
+    const principal = trades.reduce((sum, trade) => sum + (trade.side === "BUY" ? trade.grossAmount : -trade.grossAmount), 0);
+    const fees = trades.reduce((sum, trade) => sum + trade.feeAmount, 0);
+    expect(treasury.balance - treasuryStart.balance).toBe(principal);
+    expect(treasury.reserved - treasuryStart.reserved).toBe(fees);
+    expect(market.reservedLiability).toBe(1387 + fees);
+    expect(wallet.softBalance - 1000 + treasury.balance - treasuryStart.balance).toBe(-fees);
   });
 
   it("requires a second admin after challenge and pays the winning outcome", async () => {
@@ -217,7 +227,7 @@ describe.skipIf(!runDatabaseTests)("V3 prediction transaction integration", () =
       adminUserId: adminOneId,
       now: proposedAt,
     });
-    await challengePredictionResolution({
+    const challenge = await challengePredictionResolution({
       identifier: marketSlug,
       proposalId: proposal.proposalId,
       reason: "A second administrator should verify the fixture source before payout.",
@@ -234,6 +244,17 @@ describe.skipIf(!runDatabaseTests)("V3 prediction transaction integration", () =
         now: afterChallenge,
       }),
     ).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+    await expect(finalizePredictionResolution({
+      identifier: marketSlug, proposalId: proposal.proposalId, adminUserId: adminTwoId, now: afterChallenge,
+    })).rejects.toMatchObject({ code: "CHALLENGES_PENDING" });
+    await expect(reviewPredictionChallenge({
+      identifier: marketSlug, challengeId: challenge.challengeId, accepted: false,
+      evidenceUrl: "https://example.com/review", reasoning: "The original evidence is conclusive.", adminUserId: adminOneId,
+    })).rejects.toMatchObject({ status: 403 });
+    await reviewPredictionChallenge({
+      identifier: marketSlug, challengeId: challenge.challengeId, accepted: false,
+      evidenceUrl: "https://example.com/review", reasoning: "The original evidence is conclusive.", adminUserId: adminTwoId,
+    });
     const result = await finalizePredictionResolution({
       identifier: marketSlug,
       proposalId: proposal.proposalId,
@@ -246,6 +267,7 @@ describe.skipIf(!runDatabaseTests)("V3 prediction transaction integration", () =
     });
     expect(position).toMatchObject({ shares: 1, payout: 100 });
     expect(position.settledAt).toBeInstanceOf(Date);
+    expect(await prisma.resolutionChallenge.findUniqueOrThrow({ where: { id: challenge.challengeId } })).toMatchObject({ accepted: false });
   });
 
   it("voids a second market and restores net historical loss plus all fees", async () => {
@@ -305,5 +327,53 @@ describe.skipIf(!runDatabaseTests)("V3 prediction transaction integration", () =
         where: { wallet: { userId }, referenceType: "PREDICTION_REFUND" },
       }),
     ).toBe(1);
+  });
+
+  it("preserves accepted challenges and permits a corrected proposal only after all individual reviews", async () => {
+    const slug = `prediction-correction-${suffix}`;
+    await createPredictionMarket({
+      eventId: eventSlug, slug, question: "Will the corrected source resolve NO?",
+      description: "An incorrect proposal is corrected without overwriting the original evidence.",
+      resolutionSourceUrl: "https://example.com/correction", resolutionSourceLabel: "Correction fixture",
+      edgeCaseRules: "Only the dated official correction determines the result.",
+      closesAt: new Date(Date.now() + 60 * 60 * 1_000), adminUserId: adminOneId,
+    });
+    await openPredictionMarket(slug, adminOneId);
+    await lockPredictionMarket(slug, adminOneId);
+    const now = new Date();
+    const original = await proposePredictionResolution({
+      identifier: slug, outcome: "YES", evidenceUrl: "https://example.com/original",
+      reasoning: "An initial reading of the source suggests YES.", adminUserId: adminOneId, now,
+    });
+    const first = await challengePredictionResolution({
+      identifier: slug, userId: challengerId, reason: "A dated official correction explicitly states NO.",
+      evidenceUrl: "https://example.com/corrected", now,
+    });
+    const second = await challengePredictionResolution({
+      identifier: slug, userId, reason: "Another source needs an independent assessment.",
+      evidenceUrl: "https://example.com/secondary", now,
+    });
+    await reviewPredictionChallenge({
+      identifier: slug, challengeId: first.challengeId, accepted: true,
+      evidenceUrl: "https://example.com/corrected", reasoning: "The official dated correction invalidates the original proposal.",
+      adminUserId: adminTwoId, now,
+    });
+    const correction = {
+      identifier: slug, outcome: "NO", evidenceUrl: "https://example.com/corrected",
+      reasoning: "The corrected official source explicitly records NO.", adminUserId: adminOneId, now,
+    };
+    await expect(proposePredictionResolution(correction)).rejects.toMatchObject({ code: "CHALLENGES_PENDING" });
+    await reviewPredictionChallenge({
+      identifier: slug, challengeId: second.challengeId, accepted: false,
+      evidenceUrl: "https://example.com/corrected", reasoning: "The secondary source is superseded by the dated correction.",
+      adminUserId: adminTwoId, now,
+    });
+    const revised = await proposePredictionResolution(correction);
+    expect(revised.proposalId).not.toBe(original.proposalId);
+    expect(new Date(revised.challengeEndsAt).getTime() - now.getTime()).toBe(24 * 60 * 60 * 1000);
+    expect(await prisma.resolutionProposal.findUniqueOrThrow({ where: { id: original.proposalId } })).toMatchObject({ status: "VOIDED", evidenceUrl: "https://example.com/original" });
+    expect(await prisma.resolutionChallenge.findUniqueOrThrow({ where: { id: first.challengeId } })).toMatchObject({ accepted: true });
+    await expect(finalizePredictionResolution({ identifier: slug, adminUserId: adminTwoId, now })).rejects.toMatchObject({ code: "CHALLENGE_WINDOW_OPEN" });
+    await voidPredictionMarket({ identifier: slug, adminUserId: adminTwoId, reason: "Clean up the corrected integration market after assertions." });
   });
 });

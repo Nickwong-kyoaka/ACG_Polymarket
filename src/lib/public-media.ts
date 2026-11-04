@@ -1,19 +1,13 @@
 import type { Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { publicAssetWhere, renderPublicAsset } from "@/lib/public-assets";
+import { pullLinkedPostMedia } from "@/lib/post-media";
 
 type PublicMediaLocale = "en" | "zh-Hant";
 
 function dbLocale(locale: PublicMediaLocale) {
   return locale === "zh-Hant" ? "ZH_HANT" as const : "EN" as const;
-}
-
-function renderedUrl(asset: { publicUrl: string | null; storageKey: string; derivatives: Array<{ publicUrl: string; width: number; height: number; kind: string }> }) {
-  const derivative = asset.derivatives.find((entry) => entry.kind === "CARD") ?? asset.derivatives.find((entry) => entry.kind === "HERO") ?? asset.derivatives[0];
-  if (derivative) return { url: derivative.publicUrl, width: derivative.width, height: derivative.height };
-  if (asset.publicUrl?.startsWith("https://")) return { url: asset.publicUrl, width: null, height: null };
-  if (asset.storageKey.startsWith("assets/")) return { url: `/${asset.storageKey}`, width: null, height: null };
-  return null;
 }
 
 const publicAssetSelect = {
@@ -41,7 +35,7 @@ type PublicAssetRecord = Prisma.CharacterAssetGetPayload<{ select: typeof public
 
 function assetDto(asset: PublicAssetRecord, locale: PublicMediaLocale) {
   if (!asset) return null;
-  const media = renderedUrl(asset);
+  const media = renderPublicAsset(asset);
   if (!media) return null;
   const localized = asset.locales.find((entry) => entry.locale === dbLocale(locale));
   return {
@@ -76,7 +70,7 @@ export async function listPublicGallery(input: { locale?: PublicMediaLocale; cha
     select: {
       id: true, slug: true, name: true, title: true, accentFrom: true, accentTo: true,
       locales: { select: { locale: true, name: true, title: true } },
-      assets: { where: { workflowStatus: "PUBLISHED", contentRating: "SFW", permissionStatus: { notIn: ["REJECTED", "TAKEDOWN_REQUESTED"] } }, orderBy: [{ primaryPriority: "desc" }, { publishedAt: "desc" }], select: publicAssetSelect },
+      assets: { where: publicAssetWhere, orderBy: [{ primaryPriority: "desc" }, { publishedAt: "desc" }], select: publicAssetSelect },
     },
   });
   const hasMore = records.length > limit;
@@ -104,7 +98,10 @@ export async function submitTakedown(input: { assetId: string; requesterUserId?:
   return prisma.$transaction(async (tx) => {
     const request = await tx.takedownRequest.create({ data: { assetId: asset.id, requesterUserId: input.requesterUserId, requesterName: input.requesterName, requesterEmail: input.requesterEmail.toLowerCase(), reason: input.reason, evidenceUrl: input.evidenceUrl } });
     const immediatelyPulled = asset.permissionStatus === "UNVERIFIED";
-    if (immediatelyPulled) await tx.characterAsset.update({ where: { id: asset.id }, data: { permissionStatus: "TAKEDOWN_REQUESTED", workflowStatus: "PULLED" } });
+    if (immediatelyPulled) {
+      await tx.characterAsset.update({ where: { id: asset.id }, data: { permissionStatus: "TAKEDOWN_REQUESTED", workflowStatus: "PULLED", publishedAt: null } });
+      await pullLinkedPostMedia(tx, asset.id);
+    }
     await tx.assetAuditLog.create({ data: { assetId: asset.id, actorUserId: input.requesterUserId, action: "TAKEDOWN_REQUESTED", detail: { requestId: request.id, immediatelyPulled } } });
     return { id: request.id, status: request.status, immediatelyPulled };
   });

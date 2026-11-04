@@ -2,6 +2,7 @@ import { z } from "zod";
 import { apiOk, AppError, handleApiError, parseJson } from "@/lib/api";
 import { requireAdminSessionUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { pullLinkedPostMedia } from "@/lib/post-media";
 
 const schema = z.object({
   status: z.enum(["REVIEWING", "RESOLVED", "DISMISSED"]),
@@ -26,6 +27,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           where: { id: current.assetId },
           data: { workflowStatus: "PULLED", permissionStatus: "TAKEDOWN_REQUESTED", publishedAt: null },
         });
+        await pullLinkedPostMedia(tx, current.assetId);
       }
       const takedown = await tx.takedownRequest.update({
         where: { id },
@@ -41,7 +43,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         },
       });
       return takedown;
-    });
+    }, { isolationLevel: "Serializable" });
     return apiOk({ takedown: { ...result, updatedAt: result.updatedAt.toISOString() } });
   } catch (error) {
     return handleApiError(error);

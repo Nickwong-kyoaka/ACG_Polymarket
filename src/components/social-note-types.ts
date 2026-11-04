@@ -34,9 +34,9 @@ export interface SocialNote {
   } | null;
   series: { id: string; slug: string; title: string } | null;
   media: SocialNoteMedia[];
-  topics: Array<{ slug: string; title: string }>;
+  topics: Array<{ id?: string; slug: string; title: string }>;
   counts: { saves: number; reactions: number; comments: number };
-  viewer: { saved: boolean; followingAuthor: boolean; followingCharacter: boolean };
+  viewer: { saved: boolean; followingAuthor: boolean; followingCharacter: boolean; reactions?: string[] };
 }
 
 export interface SocialFeedPayload {
@@ -126,7 +126,7 @@ export function normalizeSocialNote(value: unknown): SocialNote | null {
     topics: rawTopics.map((entry) => {
       const wrapper = record(entry);
       const topic = Object.keys(record(wrapper.topic)).length ? record(wrapper.topic) : wrapper;
-      return { slug: text(topic.slug), title: text(topic.title, text(topic.slug)) };
+      return { id: text(topic.id) || undefined, slug: text(topic.slug), title: text(topic.title, text(topic.slug)) };
     }).filter((topic) => topic.slug),
     counts: {
       saves: number(rawCounts.saves),
@@ -137,6 +137,7 @@ export function normalizeSocialNote(value: unknown): SocialNote | null {
       saved: boolean(rawViewer.saved ?? item.saved),
       followingAuthor: boolean(rawViewer.followingAuthor),
       followingCharacter: boolean(rawViewer.followingCharacter),
+      reactions: Array.isArray(rawViewer.reactions) ? rawViewer.reactions.filter((value): value is string => typeof value === "string") : [],
     },
   };
 }

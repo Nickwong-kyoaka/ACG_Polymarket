@@ -60,7 +60,7 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
   const timeFormatter = new Intl.DateTimeFormat(zh ? "zh-HK" : "en", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Hong_Kong" });
   const calendarEntries = calendar.episodes.map((episode) => ({
     id: episode.id,
-    href: `${localePath(locale, "/community")}?tab=seasonal`,
+    href: localePath(locale, `/series/${episode.series.slug}`),
     dayLabel: episode.airAt ? dayFormatter.format(new Date(episode.airAt)) : pick(locale, "TBA", "待定"),
     timeLabel: episode.airAt ? timeFormatter.format(new Date(episode.airAt)) : "--:--",
     seriesTitle: episode.series.title,
@@ -68,6 +68,9 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
     watched: episode.progress === "WATCHED",
   }));
   const completedMissions = dashboard?.missions.filter((mission) => mission.completed).length ?? 0;
+  const issue = getHongKongDayKey().slice(0, 7);
+  const seasonIndex = Math.floor((Number(issue.slice(5, 7)) - 1) / 3);
+  const seasonLabel = zh ? ["冬季號", "春季號", "夏季號", "秋季號"][seasonIndex] : ["WINTER ISSUE", "SPRING ISSUE", "SUMMER ISSUE", "AUTUMN ISSUE"][seasonIndex];
 
   return (
     <div>
@@ -76,14 +79,14 @@ export default async function ExchangeLobby({ params }: { params: Promise<{ loca
         <section className="editorial-cover grid overflow-hidden lg:grid-cols-[1.12fr_.88fr]">
           <div className="editorial-hero-art group relative min-h-[470px] sm:min-h-[590px] lg:min-h-[710px]">
             <CharacterArt character={hero} asset={heroAsset} className="absolute inset-0 h-full" priority sizes="(min-width: 1024px) 58vw, 100vw" />
-            <div className="absolute left-4 top-4 z-10 -rotate-1 border border-[#2c2724] bg-[#f2ca61] px-3 py-2 text-[#2c2724] shadow-[3px_3px_0_#2c2724] sm:left-6 sm:top-6"><p className="text-[9px] font-black tracking-[.16em]">ISSUE 09 / COVER</p></div>
+            <div className="absolute left-4 top-4 z-10 -rotate-1 border border-[#2c2724] bg-[#f2ca61] px-3 py-2 text-[#2c2724] shadow-[3px_3px_0_#2c2724] sm:left-6 sm:top-6"><p className="text-[9px] font-black tracking-[.16em]">{issue} / {zh ? "封面" : "COVER"}</p></div>
             <div className="editorial-caption absolute inset-x-4 bottom-4 z-10 p-4 text-white sm:inset-x-6 sm:bottom-6 sm:p-5">
               <p className="text-[9px] font-black uppercase tracking-[.17em] text-white/55">{zh ? "今日封面角色" : "TODAY'S COVER"} · {hero.title}</p>
               <div className="mt-2 flex items-end justify-between gap-4"><div><p className="font-display text-3xl sm:text-4xl">{hero.name}</p><p className="mt-2 max-w-xl text-xs leading-6 text-white/65 sm:text-sm">{hero.favoritePhrase}</p></div><span className="hidden text-right text-[10px] font-bold leading-5 text-white/55 sm:block">{hero.supporterCount} {zh ? "位應援者" : "supporters"}<br />{hero.circulatingUnits} {zh ? "份應援" : "support units"}</span></div>
             </div>
           </div>
           <div className="editorial-cover-copy relative flex flex-col justify-center p-6 text-white sm:p-10 xl:p-14">
-            <div className="issue-tab w-fit text-[#f2ca61]"><strong>09</strong><span>{zh ? "社團房間 · 夏季號" : "CLUB ROOM · SUMMER ISSUE"}</span></div>
+            <div className="issue-tab w-fit text-[#f2ca61]"><strong>{issue.slice(5, 7)}</strong><span>{zh ? "社團房間" : "CLUB ROOM"} · {seasonLabel}</span></div>
             <h1 className="exchange-title relative z-10 mt-8 text-white">{zh ? "把今天想收藏的一幕，留在這張桌上。" : "Leave the scene you want to keep on this desk."}</h1>
             <p className="relative z-10 mt-7 max-w-xl text-base leading-8 text-white/68 sm:text-lg">{zh ? "翻新番、讀角色筆記、追一則官方消息，也替喜歡的角色添一份應援。每次回來，書架都會多一點熟悉的內容。" : "Browse the season, read character notes, follow an official signal, or add support for someone you like. Each return makes the shelf feel a little more yours."}</p>
             <div className="relative z-10 mt-8 flex flex-wrap gap-3">

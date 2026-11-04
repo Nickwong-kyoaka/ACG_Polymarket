@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Heart, Sparkles } from "lucide-react";
 import type { PublicLocale } from "@/components/acg-locale";
+import { trackEngagement } from "@/lib/client-analytics";
 
 export interface OnboardingCharacter {
   id: string;
@@ -52,6 +53,8 @@ export function OnboardingPicker({
   const [characterIds, setCharacterIds] = useState<string[]>(initialCharacterIds.slice(0, 3));
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [saving, setSaving] = useState(false);
+  const locked = useRef(false);
 
   function toggleTag(value: string) {
     setTags((current) => current.includes(value) ? current.filter((tag) => tag !== value) : current.length < 5 ? [...current, value] : current);
@@ -62,27 +65,34 @@ export function OnboardingPicker({
   }
 
   async function finish() {
+    if (locked.current) return;
     if (tags.length === 0 || characterIds.length === 0) {
       setMessage(zh ? "先挑一個興趣和一名想關注的角色吧。" : "Pick at least one interest and one character to follow.");
       return;
     }
 
-    setMessage("");
-    const response = await fetch("/api/me/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ locale, favoriteTags: tags, characterIds }),
-    });
-    const payload = await response.json().catch(() => ({})) as { error?: string };
-    if (!response.ok) {
-      setMessage(payload.error ?? (zh ? "暫時未能保存，請再試一次。" : "We could not save this yet. Please try again."));
-      return;
-    }
+    locked.current = true; setSaving(true); setMessage("");
+    try {
+      const response = await fetch("/api/me/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale, favoriteTags: tags, characterIds }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) {
+        setMessage(payload.error ?? (zh ? "暫時未能保存，請再試一次。" : "We could not save this yet. Please try again."));
+        return;
+      }
 
-    startTransition(() => {
-      router.push(nextPath);
-      router.refresh();
-    });
+      // The API owns completion; this event links its user to the anonymous acquisition session.
+      trackEngagement("ONBOARDING_COMPLETED", locale, window.location.pathname, { emitter: "client-attribution", attributionOnly: true, characterCount: characterIds.length, interestCount: tags.length });
+      startTransition(() => {
+        router.push(nextPath);
+        router.refresh();
+      });
+    } catch {
+      setMessage(zh ? "網絡暫時未接通，選擇已保留，請重試。" : "Network unavailable. Your picks are safe; please retry.");
+    } finally { locked.current = false; setSaving(false); }
   }
 
   return (
@@ -134,7 +144,7 @@ export function OnboardingPicker({
 
       <div className="onboarding-finish">
         <div><p>{zh ? "下一頁會依照這些選擇整理內容。" : "Your next page will be arranged around these picks."}</p>{message ? <strong role="alert">{message}</strong> : null}</div>
-        <button type="button" onClick={finish} disabled={isPending}>{isPending ? (zh ? "正在整理房間…" : "Arranging your room…") : (zh ? "完成，去社群看看" : "Finish and visit the clubroom")}</button>
+        <button type="button" onClick={finish} disabled={isPending || saving}>{isPending || saving ? (zh ? "正在整理房間…" : "Arranging your room…") : (zh ? "完成，去社群看看" : "Finish and visit the clubroom")}</button>
       </div>
     </div>
   );

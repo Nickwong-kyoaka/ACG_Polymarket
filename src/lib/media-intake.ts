@@ -1,9 +1,12 @@
-import { createHash } from "node:crypto";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { createHash, randomUUID } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { request as httpsRequest } from "node:https";
+import { Readable } from "node:stream";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { AppError } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
-import { probeRemoteMedia } from "../../scripts/media/import-safety";
+import { assertPublicHttpsTarget, MEDIA_FETCH_TIMEOUT_MS, probeRemoteMedia } from "../../scripts/media/import-safety";
 
 type ImportSourceKind = "FAN_ART" | "OPEN_LICENSE" | "OFFICIAL_REFERENCE" | "USER_PROVIDED";
 type Permission = "VERIFIED" | "CREATOR_GRANTED" | "UNVERIFIED";
@@ -30,6 +33,100 @@ function publicUrl(base: string, key: string) {
   return `${base}/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+// Pin the validated DNS answer to the TLS connection, including every redirect.
+// A separate DNS check followed by ordinary fetch is vulnerable to rebinding.
+const pinnedMediaFetch: typeof fetch = async (input) => {
+  const value = String(input);
+  // IPv4-only transport also excludes IPv4-mapped/transition IPv6 bypasses.
+  const addresses = await lookup(new URL(value).hostname, { family: 4, all: true, verbatim: true });
+  const url = await assertPublicHttpsTarget(value, async () => addresses.map((entry) => entry.address));
+  const address = addresses[0];
+  return new Promise<Response>((resolve, reject) => {
+    const request = httpsRequest(url, {
+      agent: false,
+      family: 4,
+      signal: AbortSignal.timeout(MEDIA_FETCH_TIMEOUT_MS),
+      lookup: (_hostname, _options, callback) => callback(null, address.address, address.family),
+      headers: { Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif", "User-Agent": "ACG-Media-Intake/1.0" },
+    }, (response) => {
+      try {
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(response.headers)) {
+          if (value !== undefined) headers.set(name, Array.isArray(value) ? value.join(", ") : value);
+        }
+        const status = response.statusCode;
+        if (status === 204 || status === 205 || status === 304) {
+          response.resume();
+          resolve(new Response(null, { status, headers }));
+          return;
+        }
+        resolve(new Response(Readable.toWeb(response) as ReadableStream<Uint8Array>, { status, headers }));
+      } catch (error) {
+        response.destroy();
+        reject(error);
+      }
+    });
+    request.on("error", reject);
+    request.end();
+  });
+};
+
+export function postMediaOwnerKey(userId: string) {
+  return createHash("sha256").update(userId).digest("hex").slice(0, 32);
+}
+
+function postMediaOrigin() {
+  const value = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL;
+  const url = value ? new URL(value) : null;
+  if (!url || url.protocol !== "https:" || url.username || url.password) {
+    throw new AppError("An HTTPS app origin is required for media intake.", 503, "MEDIA_ORIGIN_NOT_CONFIGURED");
+  }
+  return url.origin;
+}
+
+function privatePostStorage() {
+  const bucket = process.env.S3_PRIVATE_BUCKET;
+  if (!bucket || bucket === process.env.S3_BUCKET) throw new AppError("A separate private media bucket is required for review quarantine.", 503, "PRIVATE_STORAGE_NOT_CONFIGURED");
+  return { ...storage(), bucket };
+}
+
+export function isNormalizedPostMedia(media: { storageKey: string | null | undefined; publicUrl: string | null | undefined }, userId: string) {
+  const match = media.storageKey?.match(/^post-media\/([a-f0-9]{32})\/([a-f0-9-]{36})\.webp$/);
+  return Boolean(match && match[1] === postMediaOwnerKey(userId) && media.publicUrl === `${postMediaOrigin()}/api/post-media/${match[2]}`);
+}
+
+export async function importRemotePostMedia(directMediaUrl: string, userId: string) {
+  const origin = postMediaOrigin();
+  const s3 = privatePostStorage();
+  try {
+    const probed = await probeRemoteMedia(directMediaUrl, { fetchImpl: pinnedMediaFetch });
+    const normalized = await sharp(probed.bytes, { limitInputPixels: 40_000_000, animated: false })
+      .rotate().resize({ width: 2400, height: 2400, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 88 }).toBuffer();
+    const id = randomUUID();
+    const storageKey = `post-media/${postMediaOwnerKey(userId)}/${id}.webp`;
+    // Private bucket policy must keep post-media/* private. Only the gated route
+    // reads these bytes; quarantine is never exposed through S3_PUBLIC_BASE_URL.
+    await s3.client.send(new PutObjectCommand({
+      Bucket: s3.bucket, Key: storageKey, Body: normalized, ContentType: "image/webp",
+      CacheControl: "private,no-store",
+      Metadata: { "source-checksum": probed.sha256, "owner-key": postMediaOwnerKey(userId) },
+    }));
+    return { publicUrl: `${origin}/api/post-media/${id}`, storageKey };
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError("Media could not be safely fetched, decoded, or stored. Use a public HTTPS image within the 15 MB limit.", 422, "MEDIA_INTAKE_FAILED");
+  }
+}
+
+export async function readPrivatePostMedia(storageKey: string) {
+  if (!/^post-media\/[a-f0-9]{32}\/[a-f0-9-]{36}\.webp$/.test(storageKey)) throw new AppError("Media not found.", 404, "MEDIA_NOT_FOUND");
+  const s3 = privatePostStorage();
+  const result = await s3.client.send(new GetObjectCommand({ Bucket: s3.bucket, Key: storageKey }));
+  if (!result.Body) throw new AppError("Media not found.", 404, "MEDIA_NOT_FOUND");
+  return result.Body.transformToByteArray();
+}
+
 export async function importRemoteCharacterMedia(input: {
   adminUserId: string;
   characterId: string;
@@ -51,7 +148,7 @@ export async function importRemoteCharacterMedia(input: {
   for (const url of [input.sourcePageUrl, input.creatorUrl, input.licenseUrl].filter(Boolean) as string[]) if (!url.startsWith("https://")) throw new AppError("Media source URLs must use HTTPS.", 422, "HTTPS_REQUIRED");
   const character = await prisma.character.findUnique({ where: { id: input.characterId }, select: { id: true, slug: true } });
   if (!character) throw new AppError("Character not found.", 404, "CHARACTER_NOT_FOUND");
-  const probed = await probeRemoteMedia(input.directMediaUrl);
+  const probed = await probeRemoteMedia(input.directMediaUrl, { fetchImpl: pinnedMediaFetch });
   if (await prisma.characterAsset.findUnique({ where: { checksum: probed.sha256 }, select: { id: true } })) throw new AppError("This media file is already registered.", 409, "DUPLICATE_MEDIA");
 
   const s3 = storage();

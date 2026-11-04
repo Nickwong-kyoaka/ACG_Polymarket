@@ -71,7 +71,6 @@ export function MarketHistoryChart({
         if (active) setStatus("error");
       }
     };
-    setStatus("loading");
     void load();
     const interval = window.setInterval(load, 15_000);
     return () => { active = false; window.clearInterval(interval); };
@@ -100,7 +99,7 @@ export function MarketHistoryChart({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex rounded-[14px_4px_14px_4px] bg-black/20 p-1" aria-label="History range">
           {(["24h", "7d", "30d"] as const).map((entry) => (
-            <button key={entry} type="button" onClick={() => setRange(entry)} className={cn("rounded-[10px_3px_10px_3px] px-4 py-2 text-[10px] font-black uppercase tracking-[.14em] text-white/42", range === entry && "bg-white text-slate-900")}>{entry}</button>
+            <button key={entry} type="button" onClick={() => { if (entry !== range) { setStatus("loading"); setRange(entry); } }} className={cn("rounded-[10px_3px_10px_3px] px-4 py-2 text-[10px] font-black uppercase tracking-[.14em] text-white/42", range === entry && "bg-white text-slate-900")}>{entry}</button>
           ))}
         </div>
         {summary?.currentQuote ? <p className="text-xl font-black text-white">{currencyLabel(summary.currentQuote)}</p> : null}

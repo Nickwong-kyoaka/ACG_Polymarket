@@ -96,6 +96,7 @@ export function AdminCommunityConsole({
                   {post.media.map((media) => (
                     <div key={media.id} className="rounded-2xl bg-[#fff8ed] p-4">
                       <div className="flex items-center justify-between gap-2"><strong className="text-xs text-[#171126]">{media.altText}</strong><span className="text-[9px] font-black text-slate-400">{media.status}</span></div>
+                      <a href={`/api/admin/post-media/${encodeURIComponent(media.id)}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-black text-[#1659a9] hover:underline">Inspect normalized image (admin only)</a>
                       <p className="mt-2 text-xs text-slate-500">{media.sourceLabel || "Source label missing"}</p>
                       {media.sourceUrl ? <a href={media.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-black text-[#1659a9] hover:underline">Inspect source <ExternalLink className="h-3.5 w-3.5" /></a> : <p className="mt-2 text-xs font-bold text-rose-600">Source URL missing</p>}
                     </div>

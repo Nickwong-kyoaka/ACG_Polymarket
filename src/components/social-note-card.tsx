@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Bookmark, Eye, Heart, MessageCircle, Sparkle } from "lucide-react";
 import { localePath, type PublicLocale } from "@/components/acg-locale";
 import { ShareButton } from "@/components/share-button";
+import { FollowButton } from "@/components/follow-button";
 import type { SocialNote } from "@/components/social-note-types";
 
 function coverStyle(note: SocialNote) {
@@ -20,12 +21,17 @@ export function SocialNoteCard({ note, locale, priority = false }: { note: Socia
   const [saveCount, setSaveCount] = useState(note.counts.saves);
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState("");
+  const [liked, setLiked] = useState(note.viewer.reactions?.includes("LIKE") ?? false);
+  const [reactionCount, setReactionCount] = useState(note.counts.reactions);
+  const isPost = !note.href;
   const postPath = note.href ? localePath(locale, note.href) : localePath(locale, `/posts/${note.slug}`);
   const initials = note.author.displayName.trim().charAt(0).toUpperCase() || "A";
 
   async function toggleSave() {
+    if (pending) return;
     setPending(true);
     setStatus("");
+    try {
     const response = await fetch(`/api/posts/${encodeURIComponent(note.id)}/save`, { method: saved ? "DELETE" : "POST" });
     if (response.ok) {
       setSaved((current) => !current);
@@ -35,7 +41,20 @@ export function SocialNoteCard({ note, locale, priority = false }: { note: Socia
     } else {
       setStatus(zh ? "暫時未能收藏。" : "This note could not be saved yet.");
     }
-    setPending(false);
+    } catch { setStatus(zh ? "連線中斷，請再試一次。" : "Connection lost. Please try again."); }
+    finally { setPending(false); }
+  }
+
+  async function toggleLike() {
+    if (pending) return;
+    setPending(true); setStatus("");
+    try {
+      const response = await fetch(`/api/posts/${encodeURIComponent(note.id)}/reactions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "LIKE" }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(response.status === 401 ? (zh ? "登入後留下喜歡。" : "Sign in to leave a like.") : payload.error);
+      setLiked(payload.reacted); setReactionCount(payload.reactionCount);
+    } catch (error) { setStatus(error instanceof Error ? error.message : (zh ? "暫時無法送出。" : "Could not send.")); }
+    finally { setPending(false); }
   }
 
   return (
@@ -52,16 +71,17 @@ export function SocialNoteCard({ note, locale, priority = false }: { note: Socia
         {note.recommendationReason ? <p className="social-reason"><Sparkle />{note.recommendationReason}</p> : null}
         <Link href={postPath}><h2>{note.title}</h2></Link>
         <p className="social-note-excerpt">{note.body}</p>
-        <div className="social-note-topics">{note.topics.slice(0, 3).map((topic) => <span key={topic.slug}>#{topic.title}</span>)}</div>
+        <div className="social-note-topics">{note.topics.slice(0, 3).map((topic) => <span key={topic.slug}>#{topic.title} {topic.id ? <FollowButton targetType="topic" targetId={topic.id} locale={locale} /> : null}</span>)}</div>
         <div className="social-note-author">
           <span className="social-avatar">{note.author.imageUrl ? <i style={{ backgroundImage: `url(${JSON.stringify(note.author.imageUrl)})` }} /> : initials}</span>
           <span><strong>{note.author.displayName}</strong><small>@{note.author.handle}</small></span>
+          {isPost ? <FollowButton targetType="user" targetId={note.author.id} initialFollowing={note.viewer.followingAuthor} locale={locale} /> : null}
           {note.character ? <Link href={localePath(locale, `/character/${note.character.slug}`)}>{note.character.name}</Link> : null}
         </div>
         <div className="social-note-actions">
-          <span className="social-action"><Heart />{note.counts.reactions}</span>
+          {isPost ? <button type="button" className="social-action" onClick={toggleLike} aria-pressed={liked} disabled={pending}><Heart fill={liked ? "currentColor" : "none"} />{reactionCount}</button> : <span className="social-action"><Heart />{reactionCount}</span>}
           <Link href={`${postPath}#conversation`} className="social-action"><MessageCircle />{note.counts.comments}</Link>
-          <button type="button" className={saved ? "social-action is-saved" : "social-action"} onClick={toggleSave} disabled={pending} aria-pressed={saved}><Bookmark />{saveCount}</button>
+          {isPost ? <button type="button" className={saved ? "social-action is-saved" : "social-action"} onClick={toggleSave} disabled={pending} aria-pressed={saved}><Bookmark />{saveCount}</button> : <Link className="social-action" href={postPath}><Bookmark />{zh ? "角色頁" : "Character"}</Link>}
           {note.viewCount > 0 ? <span className="social-action"><Eye />{note.viewCount}</span> : null}
           <ShareButton title={note.title} text={note.body} path={postPath} locale={locale} compact />
         </div>

@@ -6,7 +6,7 @@ function siteOrigin() {
   try { return new URL(configured).origin; } catch { return "http://localhost:3000"; }
 }
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const origin = siteOrigin();

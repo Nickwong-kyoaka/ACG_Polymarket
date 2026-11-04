@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { approvedMediaManifest, validateApprovedMediaManifest } from "@/data/approved-media";
 import { prisma } from "@/lib/prisma";
 
-type ApprovedMediaClient = typeof prisma;
+type ApprovedMediaClient = Prisma.TransactionClient;
 
 const blockedPermissions = new Set(["REJECTED", "TAKEDOWN_REQUESTED"]);
 

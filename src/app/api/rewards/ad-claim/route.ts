@@ -1,11 +1,10 @@
-import { apiOk, handleApiError } from "@/lib/api";
-import { claimAdReward } from "@/lib/store";
+import { AppError, handleApiError } from "@/lib/api";
 import { requireSessionUserId } from "@/lib/auth";
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
-    const idempotencyKey = request.headers.get("idempotency-key") ?? undefined;
-    return apiOk(await claimAdReward(await requireSessionUserId(), idempotencyKey));
+    await requireSessionUserId();
+    throw new AppError("Start and complete an ad session to claim a reward.", 410, "AD_SESSION_REQUIRED");
   } catch (error) {
     return handleApiError(error);
   }

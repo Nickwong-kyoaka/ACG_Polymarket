@@ -11,6 +11,10 @@ import {
   NotFoundError,
 } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { preparePostMedia } from "@/lib/post-media";
+import { publicPostMediaWhere, renderPublicPostMedia } from "@/lib/public-assets";
+import { notifyPostFollowers, recordMemberActivity } from "@/lib/engagement";
+import { classifyRetryablePrismaConflict, waitForSerializableRetry } from "@/lib/prisma-retry";
 
 export const socialLocales = ["en", "zh-Hant"] as const;
 export const feedModes = ["for-you", "following", "seasonal"] as const;
@@ -95,6 +99,7 @@ const postMediaInputSchema = z
 export const createPostInputSchema = z
   .object({
     language: z.enum(socialLocales),
+    intent: z.enum(["DRAFT", "SUBMIT"]).default("SUBMIT"),
     kind: z.enum(["NOTE", "OUTFIT", "COMIC", "VOICE", "GUIDE", "PREDICTION_TAKE"]).default("NOTE"),
     title: z.string().trim().min(1).max(120),
     body: z.string().trim().min(1).max(10_000),
@@ -215,7 +220,7 @@ function makeSlug(title: string) {
 }
 
 function isRetryableTransactionError(error: unknown) {
-  return Boolean(
+  return Boolean(classifyRetryablePrismaConflict(error)) || Boolean(
     error &&
       typeof error === "object" &&
       "code" in error &&
@@ -235,6 +240,7 @@ async function serializable<T>(operation: (tx: TransactionClient) => Promise<T>)
           "TRANSACTION_CONFLICT",
         );
       }
+      await waitForSerializableRetry(attempt + 1);
     }
   }
   throw new AppError("Transaction retry limit reached.", 409, "TRANSACTION_CONFLICT");
@@ -368,7 +374,10 @@ export function rankFeedCandidates(
   const seriesCounts = new Map<string, number>();
 
   while (remaining.length) {
-    remaining.sort((left, right) => {
+    if (ranked.length && ranked.length % 20 === 0) { authorCounts.clear(); seriesCounts.clear(); }
+    const eligible = remaining.filter(({ candidate }) => (authorCounts.get(candidate.authorId) ?? 0) < 2 && (!candidate.seriesId || (seriesCounts.get(candidate.seriesId) ?? 0) < 4));
+    if (!eligible.length) break;
+    eligible.sort((left, right) => {
       const leftPenalty =
         (authorCounts.get(left.candidate.authorId) ?? 0) * 18 +
         (left.candidate.seriesId ? (seriesCounts.get(left.candidate.seriesId) ?? 0) * 8 : 0);
@@ -382,8 +391,9 @@ export function rankFeedCandidates(
         new Date(left.candidate.publishedAt).getTime();
       return dateDifference || left.candidate.id.localeCompare(right.candidate.id);
     });
-    const selected = remaining.shift();
+    const selected = eligible[0];
     if (!selected) break;
+    remaining.splice(remaining.indexOf(selected), 1);
     ranked.push(selected);
     authorCounts.set(selected.candidate.authorId, (authorCounts.get(selected.candidate.authorId) ?? 0) + 1);
     if (selected.candidate.seriesId) {
@@ -474,31 +484,12 @@ function publicPostSelect(locale: DbLocale, viewerId?: string) {
       },
     },
     media: {
-      where: {
-        status: "APPROVED" as const,
-        OR: [
-          {
-            assetId: null,
-            OR: [
-              { publicUrl: { startsWith: "https://" } },
-              { storageKey: { startsWith: "assets/" } },
-            ],
-          },
-          {
-            asset: {
-              is: {
-                workflowStatus: "PUBLISHED" as const,
-                contentRating: "SFW" as const,
-                permissionStatus: { notIn: ["REJECTED", "TAKEDOWN_REQUESTED"] as const },
-              },
-            },
-          },
-        ],
-      },
+      where: publicPostMediaWhere,
       orderBy: [{ sortOrder: "asc" as const }, { createdAt: "asc" as const }],
       select: {
         id: true,
         assetId: true,
+        status: true,
         publicUrl: true,
         storageKey: true,
         sourceUrl: true,
@@ -518,6 +509,8 @@ function publicPostSelect(locale: DbLocale, viewerId?: string) {
             licenseName: true,
             licenseUrl: true,
             permissionStatus: true,
+            workflowStatus: true,
+            contentRating: true,
             sourceKind: true,
             locales: {
               where: { locale },
@@ -584,10 +577,7 @@ function renderedAssetUrl(asset: RenderableAsset) {
 }
 
 function publicMedia(media: PublicPostRecord["media"][number]) {
-  const assetMedia = media.asset ? renderedAssetUrl(media.asset) : null;
-  const directUrl = media.publicUrl?.startsWith("https://") ? media.publicUrl : null;
-  const localUrl = media.storageKey?.startsWith("assets/") ? `/${media.storageKey}` : null;
-  const rendered = assetMedia ?? (directUrl || localUrl ? { url: directUrl ?? localUrl!, width: null, height: null } : null);
+  const rendered = renderPublicPostMedia(media);
   if (!rendered) return null;
   const localizedAsset = media.asset?.locales[0];
   return {
@@ -731,6 +721,7 @@ export async function getSocialFeed(input: {
   const now = input.now ?? new Date();
   const signals = await loadFeedSignals(input.viewerId);
   const cursor = input.cursor ? decodeSocialCursor(input.cursor) : null;
+  const candidateLimit = Math.min(limit * 5, 200);
 
   if (
     mode === "following" &&
@@ -794,11 +785,11 @@ export async function getSocialFeed(input: {
       ],
     },
     orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
-    take: limit + 1,
+    take: candidateLimit + 1,
     select: publicPostSelect(dbLocale(locale), input.viewerId),
   });
-  const hasMore = records.length > limit;
-  const chronologicalPage = records.slice(0, limit);
+  const hasMore = records.length > candidateLimit;
+  const chronologicalPage = records.slice(0, candidateLimit);
   const ranked = rankFeedCandidates(
     chronologicalPage.map((record) => toRankingCandidate(record, year)),
     {
@@ -816,7 +807,7 @@ export async function getSocialFeed(input: {
   return {
     mode,
     locale,
-    items: ranked.flatMap((entry) => {
+    items: ranked.slice(0, limit).flatMap((entry) => {
       const record = recordById.get(entry.candidate.id);
       return record
         ? [
@@ -833,7 +824,7 @@ export async function getSocialFeed(input: {
         ? encodeSocialCursor(boundary.publishedAt ?? boundary.createdAt, boundary.id)
         : null,
     generatedAt: now.toISOString(),
-    rankingVersion: "social-v1",
+    rankingVersion: "social-v2",
     emptyReason: null,
   };
 }
@@ -934,11 +925,12 @@ async function validatePostReferences(
   if (creatorProfile.status === "SUSPENDED") {
     throw new AuthorizationError("Posting is suspended for this account.");
   }
-  return { creatorProfile, assetAltText: new Map(assets.map((asset) => [asset.id, asset.altText])) };
+  return { creatorProfile, seriesId: input.seriesId ?? character?.seriesId, assetAltText: new Map(assets.map((asset) => [asset.id, asset.altText])) };
 }
 
 export async function createPost(userId: string, rawInput: CreatePostInput) {
   const input = createPostInputSchema.parse(rawInput);
+  input.media = await preparePostMedia(input.media, userId);
   return serializable(async (tx) => {
     const references = await validatePostReferences(tx, input, userId);
     const hasNewMedia = input.media.some((media) => !media.assetId);
@@ -954,15 +946,15 @@ export async function createPost(userId: string, rawInput: CreatePostInput) {
         slug: makeSlug(input.title),
         language: dbLocale(input.language),
         kind: input.kind,
-        status: review.status,
+        status: input.intent === "DRAFT" ? "DRAFT" : review.status,
         title: input.title,
         body: input.body,
         primaryCharacterId: input.primaryCharacterId,
-        seriesId: input.seriesId,
+        seriesId: references.seriesId,
         creatorSeriesId: input.creatorSeriesId,
         sourceUrl: input.sourceUrl,
         aiGenerated: input.aiGenerated,
-        publishedAt: review.status === "PUBLISHED" ? now : null,
+        publishedAt: input.intent !== "DRAFT" && review.status === "PUBLISHED" ? now : null,
         topics: input.topicIds.length
           ? { create: input.topicIds.map((topicId) => ({ topicId })) }
           : undefined,
@@ -998,6 +990,8 @@ export async function createPost(userId: string, rawInput: CreatePostInput) {
       },
     });
 
+    await recordMemberActivity(tx, userId, input.intent === "DRAFT" ? "POST_DRAFT_SAVED" : "POST_SUBMITTED", post.id);
+    if (post.status === "PUBLISHED") await notifyPostFollowers(tx, { id: post.id, slug: post.slug, title: post.title, authorId: userId, primaryCharacterId: input.primaryCharacterId ?? null, creatorSeriesId: input.creatorSeriesId ?? null });
     return {
       post: {
         ...post,
@@ -1006,12 +1000,54 @@ export async function createPost(userId: string, rawInput: CreatePostInput) {
         createdAt: post.createdAt.toISOString(),
       },
       moderation: {
-        requiresReview: review.status === "PENDING_REVIEW",
+        requiresReview: post.status === "PENDING_REVIEW",
         reason: review.reason,
         approvedPostCount: references.creatorProfile.approvedPostCount,
         probationTarget: 3,
       },
     };
+  });
+}
+
+export async function listMyPosts(userId: string) {
+  const posts = await prisma.post.findMany({
+    where: { authorId: userId }, orderBy: { updatedAt: "desc" }, take: 100,
+    include: { media: { orderBy: { sortOrder: "asc" } }, topics: { select: { topicId: true } } },
+  });
+  return { posts: posts.map((post) => ({ ...post, language: post.language === "ZH_HANT" ? "zh-Hant" : "en",
+    createdAt: post.createdAt.toISOString(), updatedAt: post.updatedAt.toISOString(), publishedAt: post.publishedAt?.toISOString() ?? null,
+  })) };
+}
+
+export async function updateOwnPost(userId: string, id: string, rawInput: CreatePostInput) {
+  const input = createPostInputSchema.parse(rawInput);
+  const owned = await prisma.post.findFirst({ where: { id, authorId: userId }, select: { id: true, status: true } });
+  if (!owned) throw new NotFoundError("Your post was not found.");
+  if (owned.status === "REMOVED") throw new AuthorizationError("This post was removed.");
+  input.media = await preparePostMedia(input.media, userId);
+  return serializable(async (tx) => {
+    const current = await tx.post.findFirst({ where: { id, authorId: userId }, select: { id: true, status: true, slug: true } });
+    if (!current) throw new NotFoundError("Your post was not found.");
+    if (current.status === "REMOVED") throw new AuthorizationError("This post was removed. Contact the moderation desk.");
+    const references = await validatePostReferences(tx, input, userId);
+    const review = decidePostReview({ approvedPostCount: references.creatorProfile.approvedPostCount,
+      probationComplete: references.creatorProfile.probationComplete, hasNewMedia: input.media.some((media) => !media.assetId) });
+    const status = input.intent === "DRAFT" ? "DRAFT" : review.status;
+    const now = new Date();
+    const post = await tx.post.update({ where: { id }, data: {
+      language: dbLocale(input.language), title: input.title, body: input.body, kind: input.kind,
+      primaryCharacterId: input.primaryCharacterId ?? null, seriesId: references.seriesId ?? null,
+      creatorSeriesId: input.creatorSeriesId ?? null, sourceUrl: input.sourceUrl ?? null, aiGenerated: input.aiGenerated,
+      status, publishedAt: status === "PUBLISHED" ? now : null,
+      topics: { deleteMany: {}, create: input.topicIds.map((topicId) => ({ topicId })) },
+      media: { deleteMany: {}, create: input.media.map((media, sortOrder) => ({ ...media,
+        altText: media.altText ?? (media.assetId ? references.assetAltText.get(media.assetId) : "") ?? "",
+        status: media.assetId ? "APPROVED" : "PENDING_REVIEW", sortOrder, reviewedAt: media.assetId ? now : null,
+      })) },
+    }, select: { id: true, slug: true, status: true, updatedAt: true } });
+    await tx.analyticsEvent.create({ data: { userId, name: input.intent === "DRAFT" ? "POST_DRAFT_SAVED" : "POST_SUBMITTED", metadata: { postId: id } } });
+    if (status === "PUBLISHED" && current.status !== "PUBLISHED") await notifyPostFollowers(tx, { id, slug: current.slug, title: input.title, authorId: userId, primaryCharacterId: input.primaryCharacterId ?? null, creatorSeriesId: input.creatorSeriesId ?? null });
+    return { post: { ...post, updatedAt: post.updatedAt.toISOString() } };
   });
 }
 
@@ -1036,6 +1072,7 @@ async function updatePostSave(userId: string, identifier: string, desired?: bool
     const saved = desired ?? !existing;
     if (existing && !saved) await tx.postSave.delete({ where });
     if (!existing && saved) await tx.postSave.create({ data: { userId, postId } });
+    if (!existing && saved) await recordMemberActivity(tx, userId, "SAVE", postId);
     const saveCount = await tx.postSave.count({ where: { postId } });
     return { postId, saved, saveCount };
   });
@@ -1063,6 +1100,7 @@ export async function togglePostReaction(
     const existing = await tx.postReaction.findUnique({ where, select: { userId: true } });
     if (existing) await tx.postReaction.delete({ where });
     else await tx.postReaction.create({ data: { userId, postId, kind } });
+    if (!existing) await recordMemberActivity(tx, userId, "REACTION", postId);
     const reactionCount = await tx.postReaction.count({ where: { postId } });
     return { postId, kind, reacted: !existing, reactionCount };
   });
@@ -1082,6 +1120,7 @@ export async function toggleFollow(userId: string, rawInput: FollowInput) {
       const existing = await tx.userFollow.findUnique({ where, select: { followerId: true } });
       if (existing) await tx.userFollow.delete({ where });
       else await tx.userFollow.create({ data: { followerId: userId, targetId: input.targetId } });
+      if (!existing) await recordMemberActivity(tx, userId, "FOLLOW", input.targetId);
       const followerCount = await tx.userFollow.count({ where: { targetId: input.targetId } });
       return { targetType: input.targetType, targetId: input.targetId, following: !existing, followerCount };
     }
@@ -1096,6 +1135,7 @@ export async function toggleFollow(userId: string, rawInput: FollowInput) {
       const existing = await tx.characterFollow.findUnique({ where, select: { userId: true } });
       if (existing) await tx.characterFollow.delete({ where });
       else await tx.characterFollow.create({ data: { userId, characterId: input.targetId } });
+      if (!existing) await recordMemberActivity(tx, userId, "FOLLOW", input.targetId);
       const followerCount = await tx.characterFollow.count({ where: { characterId: input.targetId } });
       return { targetType: input.targetType, targetId: input.targetId, following: !existing, followerCount };
     }
@@ -1106,6 +1146,7 @@ export async function toggleFollow(userId: string, rawInput: FollowInput) {
     const existing = await tx.topicFollow.findUnique({ where, select: { userId: true } });
     if (existing) await tx.topicFollow.delete({ where });
     else await tx.topicFollow.create({ data: { userId, topicId: input.targetId } });
+    if (!existing) await recordMemberActivity(tx, userId, "FOLLOW", input.targetId);
     const followerCount = await tx.topicFollow.count({ where: { topicId: input.targetId } });
     return { targetType: input.targetType, targetId: input.targetId, following: !existing, followerCount };
   });
@@ -1152,7 +1193,7 @@ function publicCollectionSelect(locale: DbLocale) {
     items: {
       where: publicCollectionItemWhere,
       orderBy: [{ sortOrder: "asc" as const }, { createdAt: "asc" as const }],
-      take: 6,
+      take: 50,
       select: {
         id: true,
         note: true,
@@ -1418,4 +1459,39 @@ export async function listCollections(input: {
     nextCursor:
       hasMore && boundary ? encodeSocialCursor(boundary.updatedAt, boundary.id) : null,
   };
+}
+
+export async function updateOwnCollection(userId: string, id: string, rawInput: CreateCollectionInput) {
+  const input = createCollectionInputSchema.parse(rawInput);
+  return serializable(async (tx) => {
+    const current = await tx.collection.findFirst({ where: { id, userId }, select: { id: true } });
+    if (!current) throw new NotFoundError("Your collection was not found.");
+    await validateCollectionItems(tx, input.items);
+    return tx.collection.update({ where: { id }, data: { title: input.title, description: input.description, isPublic: input.isPublic,
+      items: { deleteMany: {}, create: input.items.map((item, sortOrder) => ({ ...item, sortOrder })) },
+    }, select: publicCollectionSelect("EN") }).then((record) => ({ collection: publicCollectionDto(record, "en") }));
+  });
+}
+
+export async function getVisibleCollection(identifier: string, locale: SocialLocale, viewerId?: string) {
+  const collection = await prisma.collection.findFirst({ where: { AND: [
+    { OR: [{ id: identifier }, { slug: identifier }] },
+    { OR: [{ isPublic: true }, ...(viewerId ? [{ userId: viewerId }] : [])] },
+  ] }, select: publicCollectionSelect(dbLocale(locale)) });
+  if (!collection) throw new NotFoundError("Collection not found.");
+  return publicCollectionDto(collection, locale);
+}
+
+export async function deleteOwnCollection(userId: string, id: string) {
+  const result = await prisma.collection.deleteMany({ where: { id, userId } });
+  if (!result.count) throw new NotFoundError("Your collection was not found.");
+  return { deleted: true };
+}
+
+export async function listSavedPosts(userId: string, locale: SocialLocale) {
+  const records = await prisma.postSave.findMany({ where: { userId, post: { status: "PUBLISHED" } }, orderBy: { createdAt: "desc" }, take: 100,
+    select: { post: { select: publicPostSelect(dbLocale(locale), userId) } },
+  });
+  const signals = await loadFeedSignals(userId);
+  return records.map(({ post }) => publicPostDto(post, locale, signals));
 }

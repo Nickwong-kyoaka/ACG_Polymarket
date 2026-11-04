@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isPublicLocale, publicLocales } from "@/components/acg-locale";
+import { isPublicLocale } from "@/components/acg-locale";
 
-export function generateStaticParams() {
-  return publicLocales.map((locale) => ({ locale }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;

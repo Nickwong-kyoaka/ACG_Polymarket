@@ -121,6 +121,14 @@ describe("social feed ranking", () => {
     );
     expect(ranked.map((entry) => entry.candidate.id)).toEqual(["a", "b"]);
   });
+
+  it("limits an author to two and a series to four slots in a twenty-note window", () => {
+    const candidates = Array.from({ length: 40 }, (_, index) => candidate(`p-${index}`, { authorId: index < 10 ? "prolific" : `author-${index}`, seriesId: index < 20 ? "dominant-series" : `series-${index}`, saveCount: 100 - index }));
+    const ranked = rankFeedCandidates(candidates, { mode: "for-you", locale: "en", now }).slice(0, 20);
+    expect(ranked.filter(({ candidate: entry }) => entry.authorId === "prolific").length).toBeLessThanOrEqual(2);
+    expect(ranked.filter(({ candidate: entry }) => entry.seriesId === "dominant-series").length).toBeLessThanOrEqual(4);
+    expect(ranked).toHaveLength(20);
+  });
 });
 
 describe("social cursors", () => {

@@ -45,6 +45,8 @@ services:
         value: ""
       - key: S3_BUCKET
         value: acg-polymarket-assets
+      - key: S3_PRIVATE_BUCKET
+        value: ""
       - key: S3_REGION
         value: auto
       - key: S3_ENDPOINT

@@ -27,6 +27,7 @@ import { getMarketHistory, type MarketHistoryRange } from "@/lib/market-history"
 import { getPositiveMarketFeed, type MarketFeedOptions } from "@/lib/market-feed";
 import { advanceSupportCampaigns, listSupportCampaigns } from "@/lib/support-campaigns";
 import { listMarketAlerts, triggerMarketAlerts } from "@/lib/market-alerts";
+import { recordMemberActivity } from "@/lib/engagement";
 import type {
   AssetSourceKind,
   AssetWorkflowStatus,
@@ -952,6 +953,7 @@ export async function buySupport(
           idempotencyKey: key,
         },
       });
+      await recordMemberActivity(tx, user.id, "SUPPORT_TRADE", trade.id);
       await createNotification(
         tx,
         user.id,
@@ -1083,6 +1085,7 @@ export async function sellSupport(
           idempotencyKey: key,
         },
       });
+      await recordMemberActivity(tx, user.id, "SUPPORT_TRADE", trade.id);
       await createNotification(
         tx,
         user.id,
@@ -1181,7 +1184,7 @@ export async function claimAdReward(
   });
   const usedSlots = new Set(existingClaims.map((claim) => claim.slot));
   const slot = requestedSlot ?? [1, 2, 3].find((entry) => !usedSlots.has(entry));
-  if (!slot || slot < 1 || slot > AD_REWARD_DAILY_LIMIT || usedSlots.has(slot)) {
+  if (!slot || slot < 1 || slot > AD_REWARD_DAILY_LIMIT) {
     throw new AppError("You have reached today's ad reward limit.", 409, "AD_LIMIT_REACHED");
   }
   const key = idempotencyKey ?? `ad-${activeUserId}-${dayKey}-${slot}`;
@@ -1235,6 +1238,9 @@ export async function claimAdReward(
 }
 
 export async function startAdReward(userId?: string) {
+  if ((process.env.ADS_PROVIDER ?? "mock") !== "mock") {
+    throw new AppError("The rewarded ad provider is not connected yet.", 503, "AD_PROVIDER_UNAVAILABLE");
+  }
   const activeUserId = await getUserId(userId);
   const dayKey = getHongKongDayKey();
   const claims = await prisma.adRewardClaim.findMany({
@@ -1261,6 +1267,9 @@ export async function completeAdReward(input: {
   idempotencyKey?: string;
   userId?: string;
 }) {
+  if ((process.env.ADS_PROVIDER ?? "mock") !== "mock") {
+    throw new AppError("The rewarded ad provider is not connected yet.", 503, "AD_PROVIDER_UNAVAILABLE");
+  }
   const activeUserId = await getUserId(input.userId);
   const nonce = decodeAdNonce(input.nonce);
   if (
@@ -2121,6 +2130,7 @@ export async function createComfortSession(input: {
       },
     });
     await completeMissionEvent(tx, user.id, "COMFORT_SESSION");
+    await recordMemberActivity(tx, user.id, "COMFORT_SESSION", created.id);
     return created;
   });
 
@@ -2309,11 +2319,15 @@ export async function getWorkDashboard(userId?: string) {
     data: { status: "READY" },
   });
   const shifts = await prisma.workShift.findMany({
-    where: { userId: activeUserId, dayKey },
+    where: { userId: activeUserId, OR: [
+      { dayKey },
+      { status: { in: ["ACTIVE", "READY"] } },
+      { claimedAt: { gte: new Date(`${dayKey}T00:00:00+08:00`) } },
+    ] },
     orderBy: { startedAt: "desc" },
   });
   const earnedToday = shifts
-    .filter((shift) => shift.status === "CLAIMED")
+    .filter((shift) => shift.status === "CLAIMED" && shift.claimedAt && shift.claimedAt >= new Date(`${dayKey}T00:00:00+08:00`))
     .reduce((total, shift) => total + shift.reward, 0);
   return {
     dayKey,
@@ -2408,11 +2422,14 @@ export async function claimWorkShift(
       if (shift.claimedAt || shift.status === "CLAIMED") {
         throw new AppError("This shift was already claimed.", 409, "WORK_CLAIMED");
       }
+      if (shift.status !== "ACTIVE" && shift.status !== "READY") {
+        throw new AppError("This work shift is not claimable.", 409, "WORK_NOT_CLAIMABLE");
+      }
       if (shift.endsAt > new Date()) {
         throw new AppError("This shift is still in progress.", 409, "WORK_IN_PROGRESS");
       }
       const claimed = await tx.workShift.aggregate({
-        where: { userId: activeUserId, dayKey: shift.dayKey, status: "CLAIMED" },
+        where: { userId: activeUserId, claimedAt: { gte: new Date(`${getHongKongDayKey()}T00:00:00+08:00`) }, status: "CLAIMED" },
         _sum: { reward: true },
       });
       if ((claimed._sum.reward ?? 0) + shift.reward > DAILY_WORK_REWARD_LIMIT) {

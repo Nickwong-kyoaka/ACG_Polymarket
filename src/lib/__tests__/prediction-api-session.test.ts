@@ -3,17 +3,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   requireSessionUserId: vi.fn(),
   buyPredictionShares: vi.fn(),
+  requireAdminSessionUserId: vi.fn(),
+  reviewPredictionChallenge: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
   requireSessionUserId: mocks.requireSessionUserId,
+  requireAdminSessionUserId: mocks.requireAdminSessionUserId,
 }));
 
 vi.mock("@/lib/prediction-market", () => ({
   buyPredictionShares: mocks.buyPredictionShares,
+  reviewPredictionChallenge: mocks.reviewPredictionChallenge,
 }));
 
 import { POST } from "@/app/api/predictions/[identifier]/buy/route";
+import { POST as reviewChallenge } from "@/app/api/admin/predictions/[identifier]/challenges/[challengeId]/route";
 
 describe("prediction trade API identity", () => {
   beforeEach(() => {
@@ -71,5 +76,19 @@ describe("prediction trade API identity", () => {
       code: "IDEMPOTENCY_KEY_REQUIRED",
     });
     expect(mocks.buyPredictionShares).not.toHaveBeenCalled();
+  });
+
+  it("requires an explicit per-challenge decision and authenticated admin identity", async () => {
+    mocks.requireAdminSessionUserId.mockResolvedValue("session-admin");
+    mocks.reviewPredictionChallenge.mockResolvedValue({ accepted: true });
+    const payload = { accepted: true, reasoning: "Dated official evidence overturns the proposal.", evidenceUrl: "https://example.test/review", adminUserId: "forged-admin" };
+    const response = await reviewChallenge(new Request("http://localhost/api/admin/predictions/market/challenges/challenge", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+    }), { params: Promise.resolve({ identifier: "market", challengeId: "challenge" }) });
+    expect(response.status).toBe(200);
+    expect(mocks.reviewPredictionChallenge).toHaveBeenCalledWith({
+      identifier: "market", challengeId: "challenge", accepted: true, reasoning: payload.reasoning,
+      evidenceUrl: payload.evidenceUrl, adminUserId: "session-admin",
+    });
   });
 });

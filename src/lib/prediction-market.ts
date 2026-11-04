@@ -251,6 +251,32 @@ export function calculatePredictionMarketReserve(
   return Math.ceil(liquidityParameter * payoutPerShare * Math.log(2));
 }
 
+export function calculatePredictionTradeFunding(input: {
+  treasury: { balance: number; reserved: number };
+  market: { reservedLiability: number; payoutPerShare: number };
+  trade: Pick<PredictionQuoteCalculation, "side" | "grossAmount" | "feeAmount" | "yesSharesAfter" | "noSharesAfter">;
+  voidLiability: number;
+}) {
+  const { treasury, market, trade, voidLiability } = input;
+  if (![treasury.balance, treasury.reserved, market.reservedLiability, market.payoutPerShare,
+    trade.grossAmount, trade.feeAmount, trade.yesSharesAfter, trade.noSharesAfter, voidLiability]
+    .every((value) => Number.isSafeInteger(value) && value >= 0) || market.reservedLiability > treasury.reserved) {
+    throw new AppError("Prediction funding state is invalid.", 500, "INVALID_MARKET");
+  }
+  // Retain the funded historical baseline. Only newly burned fees grow that baseline.
+  const winningLiability = Math.max(trade.yesSharesAfter, trade.noSharesAfter) * market.payoutPerShare;
+  const marketReservedLiability = Math.max(market.reservedLiability + trade.feeAmount, winningLiability, voidLiability);
+  const reserveIncrease = marketReservedLiability - market.reservedLiability;
+  const reserved = treasury.reserved + reserveIncrease;
+  const balance = treasury.balance + (trade.side === "BUY" ? trade.grossAmount : -trade.grossAmount);
+  // A burned fee is refundable only because already available treasury capital backs it.
+  if (treasury.balance - treasury.reserved < trade.feeAmount || balance < reserved ||
+    ![balance, reserved, marketReservedLiability].every((value) => Number.isSafeInteger(value) && value <= 2_147_483_647)) {
+    throw new AppError("Prediction treasury cannot fund this trade and its refundable fees.", 409, "TREASURY_RESERVE_INSUFFICIENT");
+  }
+  return { balance, reserved, marketReservedLiability, reserveIncrease };
+}
+
 export function calculatePredictionQuote(input: {
   market: PredictionMarketState;
   outcome: PredictionOutcomeKey;
@@ -293,8 +319,11 @@ export function calculatePredictionQuote(input: {
       ? Math.ceil(rawGross - Number.EPSILON)
       : Math.floor(rawGross + Number.EPSILON);
   const feeAmount = Math.max(PREDICTION_MIN_FEE, Math.ceil(grossAmount * PREDICTION_FEE_RATE));
+  if (side === "SELL" && grossAmount <= feeAmount) {
+    throw new AppError("Sale proceeds must exceed the trading fee.", 422, "SELL_BELOW_FEE");
+  }
   const netAmount =
-    side === "BUY" ? grossAmount + feeAmount : Math.max(0, grossAmount - feeAmount);
+    side === "BUY" ? grossAmount + feeAmount : grossAmount - feeAmount;
 
   return {
     outcome,
@@ -523,6 +552,10 @@ function resolveOutcome(
   return { ...outcome, normalizedKey: marketOutcomeKey(outcome) };
 }
 
+export function effectivePredictionStatus(market: { status: string; closesAt: Date }, now = new Date()) {
+  return market.status === "OPEN" && market.closesAt <= now ? "LOCKED" : market.status;
+}
+
 function toPublicMarket(market: PublicMarketRecord, locale: PredictionLocale) {
   const localized = localizedMarketFields(market, locale);
   const tradingOpen = market.status === "OPEN" && market.closesAt.getTime() > Date.now();
@@ -532,7 +565,7 @@ function toPublicMarket(market: PublicMarketRecord, locale: PredictionLocale) {
     question: localized?.question ?? market.question,
     description: localized?.description ?? market.description,
     edgeCaseRules: localized?.edgeCaseRules ?? market.edgeCaseRules,
-    status: market.status,
+    status: effectivePredictionStatus(market),
     tradingOpen,
     closesAt: market.closesAt.toISOString(),
     challengeEndsAt: market.challengeEndsAt?.toISOString() ?? null,
@@ -808,27 +841,26 @@ async function applyWalletEntries(
   return balance;
 }
 
-async function updateTreasuryBalance(tx: Tx, delta: number) {
+async function reservePredictionTrade(
+  tx: Tx,
+  market: { reservedLiability: number; payoutPerShare: number },
+  trade: Parameters<typeof calculatePredictionTradeFunding>[0]["trade"],
+  voidLiability: number,
+) {
   const treasury = await tx.predictionTreasury.findUnique({ where: { id: "system" } });
   if (!treasury) {
     throw new AppError("Prediction treasury is not configured.", 500, "TREASURY_NOT_CONFIGURED");
   }
-  const nextBalance = treasury.balance + delta;
-  if (nextBalance < treasury.reserved || nextBalance < 0) {
-    throw new AppError(
-      "Prediction treasury does not have enough available reserve.",
-      409,
-      "TREASURY_RESERVE_INSUFFICIENT",
-    );
-  }
+  await requireTreasuryReconciliation(tx, treasury);
+  const funding = calculatePredictionTradeFunding({ treasury, market, trade, voidLiability });
   const updated = await tx.predictionTreasury.updateMany({
     where: { id: treasury.id, balance: treasury.balance, reserved: treasury.reserved },
-    data: { balance: nextBalance },
+    data: { balance: funding.balance, reserved: funding.reserved },
   });
   if (updated.count !== 1) {
     throw new AppError("Prediction treasury changed. Try again.", 409, "TREASURY_CHANGED");
   }
-  return { ...treasury, balance: nextBalance };
+  return funding;
 }
 
 async function getRecordedMarketReserve(db: Db) {
@@ -867,7 +899,12 @@ export async function listPredictionEvents(input: {
   if (requestedStatus && !publicStatuses.includes(requestedStatus as (typeof publicStatuses)[number])) {
     throw new AppError("Prediction market status is invalid.", 422, "INVALID_STATUS");
   }
-  const marketWhere = requestedStatus
+  const now = new Date();
+  const marketWhere: Prisma.PredictionMarketWhereInput = requestedStatus === "OPEN"
+    ? { status: "OPEN", closesAt: { gt: now } }
+    : requestedStatus === "LOCKED"
+      ? { OR: [{ status: "LOCKED" }, { status: "OPEN", closesAt: { lte: now } }] }
+    : requestedStatus
     ? { status: requestedStatus as (typeof publicStatuses)[number] }
     : { status: { in: [...publicStatuses] } };
 
@@ -953,6 +990,7 @@ export async function getPredictionMarket(
         include: { outcome: true },
       })
     : [];
+  const reviews = await getPredictionChallengeReviews(market.id);
   return {
     ...toPublicMarket(market as PublicMarketRecord, activeLocale),
     event: {
@@ -990,6 +1028,7 @@ export async function getPredictionMarket(
         reason: challenge.reason,
         evidenceUrl: challenge.evidenceUrl,
         accepted: challenge.accepted,
+        review: reviews.find((review) => review.challengeId === challenge.id) ?? null,
         createdAt: challenge.createdAt.toISOString(),
       })),
     })),
@@ -1249,11 +1288,20 @@ async function executePredictionTrade(input: {
         );
       }
 
+      const historicalFlows = await tx.predictionTrade.groupBy({
+        by: ["userId", "side"], where: { marketId: market.id }, _sum: { netAmount: true },
+      });
+      const voidLiability = calculateVoidRefunds([
+        ...historicalFlows.map((flow) => ({ userId: flow.userId, side: flow.side, netAmount: flow._sum.netAmount ?? 0 })),
+        { userId: input.userId, side: input.side, netAmount: quote.netAmount },
+      ]).reduce((sum, refund) => sum + refund.amount, 0);
+      const funding = await reservePredictionTrade(tx, market, quote, voidLiability);
       const marketUpdated = await tx.predictionMarket.updateMany({
         where: {
           id: market.id,
           status: "OPEN",
           marketVersion: quote.marketVersion,
+          reservedLiability: market.reservedLiability,
           yesShares: quote.yesSharesBefore,
           noShares: quote.noSharesBefore,
           closesAt: { gt: now },
@@ -1262,6 +1310,7 @@ async function executePredictionTrade(input: {
           yesShares: quote.yesSharesAfter,
           noShares: quote.noSharesAfter,
           marketVersion: { increment: 1 },
+          reservedLiability: funding.marketReservedLiability,
           participantCount:
             input.side === "BUY" && previousTradeCount === 0
               ? { increment: 1 }
@@ -1275,6 +1324,7 @@ async function executePredictionTrade(input: {
           "QUOTE_CHANGED",
         );
       }
+      await requireTreasuryReconciliation(tx, funding);
 
       const selectedSupplyBefore = outcome.sharesOutstanding;
       const selectedSupplyAfter =
@@ -1322,10 +1372,6 @@ async function executePredictionTrade(input: {
                 idempotencyKey: `prediction:${tradeKey}:fee`,
               },
             ]);
-      await updateTreasuryBalance(
-        tx,
-        input.side === "BUY" ? quote.netAmount : -quote.netAmount,
-      );
 
       let nextPosition;
       if (input.side === "BUY") {
@@ -1419,7 +1465,9 @@ async function executePredictionTrade(input: {
           yesShares: quote.yesSharesAfter,
           noShares: quote.noSharesAfter,
           marketVersion: quote.marketVersion + 1,
+          reservedLiability: funding.marketReservedLiability,
         },
+        treasury: { balance: funding.balance, reserved: funding.reserved },
       };
     },
   });
@@ -1677,6 +1725,7 @@ export async function openPredictionMarket(identifier: string, adminUserId: stri
     await requireAdmin(tx, adminUserId);
     const market = await findMarket(tx, identifier);
     if (market.status === "OPEN") {
+      ensureTradingOpen(market, new Date());
       return {
         marketId: market.id,
         status: market.status,
@@ -1886,6 +1935,7 @@ export async function proposePredictionResolution(input: {
     if (!["OPEN", "LOCKED"].includes(market.status)) {
       throw new AppError("This market cannot accept a resolution proposal.", 409, "INVALID_MARKET_STATUS");
     }
+    await requireReviewedChallenges(tx, market.id);
     const outcome = resolveOutcome(market, input.outcome);
     const challengeEndsAt = new Date(now.getTime() + PREDICTION_CHALLENGE_WINDOW_MS);
     const proposal = await tx.resolutionProposal.create({
@@ -1974,6 +2024,126 @@ export async function challengePredictionResolution(input: {
   });
 }
 
+const challengeReviewSchema = z.object({
+  marketId: z.string(),
+  proposalId: z.string(),
+  challengeId: z.string(),
+  adminUserId: z.string(),
+  accepted: z.boolean(),
+  evidenceUrl: z.string(),
+  reasoning: z.string(),
+  reviewedAt: z.string(),
+});
+
+export async function getPredictionChallengeReviews(marketId: string) {
+  const records = await prisma.analyticsEvent.findMany({
+    where: { name: "prediction.challenge.review", metadata: { path: ["marketId"], equals: marketId } },
+    orderBy: { createdAt: "asc" },
+  });
+  return records.flatMap((record) => {
+    const result = challengeReviewSchema.safeParse(record.metadata);
+    return result.success ? [result.data] : [];
+  });
+}
+
+export async function syncPredictionReminders(userId: string, now = new Date()) {
+  return withSerializableRetry(async (tx) => {
+    const preferences = await tx.notificationPreference.findUnique({ where: { userId } });
+    if (preferences?.predictionClosing === false) return { created: 0 };
+    const positions = await tx.predictionPosition.findMany({
+      where: {
+        userId, shares: { gt: 0 }, settledAt: null,
+        market: { status: "OPEN", closesAt: { gt: now, lte: new Date(now.getTime() + 24 * 60 * 60 * 1_000) } },
+      },
+      include: { market: true }, distinct: ["marketId"],
+    });
+    const result = await tx.notification.createMany({
+      data: positions.map(({ market }) => ({
+        id: `prediction-closing:${requestHash({ userId, marketId: market.id, closesAt: market.closesAt.toISOString() })}`,
+        userId, type: "SYSTEM" as const, title: "Prediction closing soon",
+        body: `${market.question} Trading closes at ${market.closesAt.toISOString()}.`,
+        href: `/predictions/${market.slug}`,
+        metadata: { marketId: market.id, closesAt: market.closesAt.toISOString(), kind: "prediction-closing" },
+      })), skipDuplicates: true,
+    });
+    return { created: result.count };
+  });
+}
+
+async function requireReviewedChallenges(tx: Tx, marketId: string) {
+  const pending = await tx.resolutionChallenge.count({
+    where: { proposal: { marketId }, accepted: null },
+  });
+  if (pending > 0) {
+    throw new AppError("Review each pending challenge before continuing.", 409, "CHALLENGES_PENDING");
+  }
+}
+
+export async function reviewPredictionChallenge(input: {
+  identifier: string;
+  challengeId: string;
+  accepted: boolean;
+  evidenceUrl: string;
+  reasoning: string;
+  adminUserId: string;
+  now?: Date;
+}) {
+  const evidenceUrl = ensureHttpsUrl(input.evidenceUrl, "Review evidence");
+  const reasoning = z.string().trim().min(10).max(3000).parse(input.reasoning);
+  const now = input.now ?? new Date();
+  return withSerializableRetry(async (tx) => {
+    await requireAdmin(tx, input.adminUserId);
+    const market = await findMarket(tx, input.identifier);
+    const challenge = await tx.resolutionChallenge.findUnique({
+      where: { id: input.challengeId }, include: { proposal: true },
+    });
+    if (!challenge || challenge.proposal.marketId !== market.id) {
+      throw new AppError("Resolution challenge not found.", 404, "CHALLENGE_NOT_FOUND");
+    }
+    if (challenge.proposal.proposedById === input.adminUserId || challenge.userId === input.adminUserId) {
+      throw new AuthorizationError("A challenge requires an independent administrator.");
+    }
+    if (challenge.accepted !== null) {
+      throw new AppError("This challenge has already been reviewed.", 409, "CHALLENGE_REVIEWED");
+    }
+    if (!["PROPOSED", "CHALLENGE", "LOCKED"].includes(market.status)) {
+      throw new AppError("This market no longer accepts reviews.", 409, "INVALID_MARKET_STATUS");
+    }
+    const updated = await tx.resolutionChallenge.updateMany({
+      where: { id: challenge.id, accepted: null }, data: { accepted: input.accepted },
+    });
+    if (updated.count !== 1) {
+      throw new AppError("This challenge has already been reviewed.", 409, "CHALLENGE_REVIEWED");
+    }
+    const review = {
+      marketId: market.id, proposalId: challenge.proposalId, challengeId: challenge.id,
+      adminUserId: input.adminUserId, accepted: input.accepted, evidenceUrl, reasoning,
+      reviewedAt: now.toISOString(),
+    };
+    // The existing analytics table is the append-only review audit; no rule or evidence is overwritten.
+    await tx.analyticsEvent.create({
+      data: { userId: input.adminUserId, name: "prediction.challenge.review", metadata: review },
+    });
+    if (input.accepted) {
+      await tx.resolutionProposal.update({
+        where: { id: challenge.proposalId }, data: { status: "VOIDED", resolvedAt: now },
+      });
+      await tx.predictionMarket.update({
+        where: { id: market.id },
+        data: { status: "LOCKED", challengeEndsAt: null, marketVersion: { increment: 1 } },
+      });
+    }
+    await tx.notification.create({
+      data: {
+        userId: challenge.userId, type: "SYSTEM", href: `/predictions/${market.slug}`,
+        title: input.accepted ? "Prediction challenge accepted" : "Prediction challenge rejected",
+        body: reasoning, metadata: review,
+      },
+    });
+    return review;
+  });
+}
+
 async function updateTreasuryForSettlement(
   tx: Tx,
   market: { reservedLiability: number },
@@ -1982,7 +2152,7 @@ async function updateTreasuryForSettlement(
   const treasury = await tx.predictionTreasury.findUnique({ where: { id: "system" } });
   if (!treasury) {
     if (payout === 0 && market.reservedLiability === 0) {
-      return { balance: 50_000, reserved: 0 };
+      return { balance: 0, reserved: 0 };
     }
     throw new AppError("Prediction treasury is not configured.", 500, "TREASURY_NOT_CONFIGURED");
   }
@@ -2004,6 +2174,37 @@ async function updateTreasuryForSettlement(
     throw new AppError("Prediction treasury changed. Try again.", 409, "TREASURY_CHANGED");
   }
   return { balance: nextBalance, reserved: nextReserved };
+}
+
+async function notifyPredictionSettlement(
+  tx: Tx,
+  market: { id: string; slug: string; question: string },
+  status: "RESOLVED" | "VOID",
+  payouts: Map<string, number>,
+  resolvedAt: Date,
+) {
+  const members = await tx.user.findMany({
+    where: {
+      OR: [{ predictionPositions: { some: { marketId: market.id } } }, { predictionTrades: { some: { marketId: market.id } } }],
+      AND: [{ OR: [{ notificationPreference: { is: null } }, { notificationPreference: { is: { resolutions: true } } }] }],
+    },
+    select: { id: true, profile: { select: { preferredLocale: true } } },
+  });
+  if (members.length === 0) return;
+  await tx.notification.createMany({
+    data: members.map((member) => {
+      const zh = member.profile?.preferredLocale === "ZH_HANT";
+      const payout = payouts.get(member.id) ?? 0;
+      return {
+        id: `prediction-settlement:${market.id}:${status}:${member.id}`,
+        userId: member.id, type: "SYSTEM" as const, locale: zh ? "ZH_HANT" as const : "EN" as const,
+        title: status === "VOID" ? (zh ? "預測市場已作廢" : "Prediction market voided") : (zh ? "預測市場已結算" : "Prediction market resolved"),
+        body: `${market.question} ${status === "VOID" ? (zh ? "退款入帳" : "Refund credited") : (zh ? "結算入帳" : "Settlement credited")}: ${payout} SUP.`,
+        href: `/${zh ? "zh-Hant" : "en"}/predictions/${market.slug}`,
+        metadata: { marketId: market.id, status, payout, resolvedAt: resolvedAt.toISOString() },
+      };
+    }), skipDuplicates: true,
+  });
 }
 
 export async function finalizePredictionResolution(input: {
@@ -2045,6 +2246,10 @@ export async function finalizePredictionResolution(input: {
     if (proposal.challenges.length > 0 && proposal.proposedById === input.adminUserId) {
       throw new AuthorizationError("A challenged result must be finalized by a second administrator.");
     }
+    await requireReviewedChallenges(tx, market.id);
+    if (proposal.challenges.some((challenge) => challenge.accepted === true)) {
+      throw new AppError("An accepted challenge requires a corrected proposal.", 409, "PROPOSAL_REJECTED");
+    }
 
     const winningPositions = await tx.predictionPosition.findMany({
       where: { marketId: market.id, outcomeId: proposal.outcomeId, shares: { gt: 0 } },
@@ -2078,10 +2283,6 @@ export async function finalizePredictionResolution(input: {
         data: { payout },
       });
     }
-    await tx.resolutionChallenge.updateMany({
-      where: { proposalId: proposal.id },
-      data: { accepted: false },
-    });
     await tx.resolutionProposal.update({
       where: { id: proposal.id },
       data: { status: "CONFIRMED", resolvedAt: settledAt },
@@ -2097,6 +2298,8 @@ export async function finalizePredictionResolution(input: {
         marketVersion: { increment: 1 },
       },
     });
+    await requireTreasuryReconciliation(tx, treasury);
+    await notifyPredictionSettlement(tx, market, "RESOLVED", new Map(winningPositions.map((position) => [position.userId, position.shares * market.payoutPerShare])), settledAt);
     return {
       marketId: market.id,
       status: "RESOLVED" as const,
@@ -2145,6 +2348,7 @@ export async function voidPredictionMarket(input: {
     if (market.status === "RESOLVED") {
       throw new AppError("A resolved market cannot be voided.", 409, "INVALID_MARKET_STATUS");
     }
+    await requireReviewedChallenges(tx, market.id);
     const trades = await tx.predictionTrade.findMany({
       where: { marketId: market.id },
       select: { userId: true, side: true, netAmount: true },
@@ -2199,10 +2403,6 @@ export async function voidPredictionMarket(input: {
         resolvedAt: now,
       },
     });
-    await tx.resolutionChallenge.updateMany({
-      where: { proposal: { marketId: market.id }, accepted: null },
-      data: { accepted: true },
-    });
     await tx.predictionMarket.update({
       where: { id: market.id },
       data: {
@@ -2213,6 +2413,8 @@ export async function voidPredictionMarket(input: {
         marketVersion: { increment: 1 },
       },
     });
+    await requireTreasuryReconciliation(tx, treasury);
+    await notifyPredictionSettlement(tx, market, "VOID", new Map(refunds.map((refund) => [refund.userId, refund.amount])), now);
     return {
       marketId: market.id,
       status: "VOID" as const,

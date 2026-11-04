@@ -817,6 +817,31 @@ export async function decideEditProposal(
       values[change.fieldKey] = parsed.newValue;
     }
 
+    let summaryRights: { licenseName: string; sourceLabel: string } | undefined;
+    const summaryChange = proposal.entityType === "SERIES" ? proposal.changes.find((change) => change.fieldKey === "summary") : undefined;
+    if (summaryChange) {
+      // This event name is server-only, not accepted by the public analytics API.
+      const staged = await tx.analyticsEvent.findFirst({
+        where: { name: "BANGUMI_IMPORT_STAGED", userId: proposal.authorId, metadata: { path: ["proposalId"], equals: proposal.id } },
+        orderBy: { createdAt: "desc" }, select: { metadata: true },
+      });
+      if (staged) {
+        const rights = z.object({
+          proposalId: z.literal(proposal.id), seriesId: z.literal(proposal.entityId),
+          subjectId: z.string().regex(/^[1-9][0-9]{0,14}$/), snapshotId: z.string().min(1),
+          includeSummary: z.literal(true), licenseName: z.string().trim().min(2).max(120),
+          originalAuthor: z.string().trim().min(2).max(180), attributionText: z.string().trim().min(8).max(1000),
+        }).safeParse(staged.metadata);
+        if (!rights.success) throw new AppError("Imported summary attribution is incomplete. Re-stage the import with explicit rights.", 422, "IMPORT_ATTRIBUTION_INVALID");
+        const evidence = await tx.externalSnapshot.findUnique({ where: { id: rights.data.snapshotId } });
+        const payload = z.object({ data: z.object({ summary: z.string() }) }).safeParse(evidence?.payload);
+        if (!evidence || evidence.provider !== "BANGUMI" || evidence.entityType !== "SERIES" || evidence.entityId !== proposal.entityId || evidence.externalId !== rights.data.subjectId || evidence.sourceUrl !== `https://api.bgm.tv/v0/subjects/${rights.data.subjectId}` || summaryChange.sourceUrl !== `https://bangumi.tv/subject/${rights.data.subjectId}` || !payload.success || payload.data.data.summary.trim() !== values.summary) {
+          throw new AppError("Imported summary no longer matches its attributed snapshot. Re-stage the import before approval.", 422, "IMPORT_ATTRIBUTION_MISMATCH");
+        }
+        summaryRights = { licenseName: rights.data.licenseName, sourceLabel: `${rights.data.originalAuthor}: ${rights.data.attributionText}` };
+      }
+    }
+
     const snapshot = await applyEntityChanges(tx, proposal.entityType, proposal.entityId, values);
     const latest = await tx.entityRevision.findFirst({
       where: { entityType: proposal.entityType, entityId: proposal.entityId },
@@ -840,6 +865,7 @@ export async function decideEditProposal(
         fieldKey: change.fieldKey,
         sourceLabel: new URL(change.sourceUrl).hostname.replace(/^www\./, ""),
         sourceUrl: change.sourceUrl,
+        ...(change.fieldKey === "summary" && summaryRights ? summaryRights : {}),
       })),
     });
     await tx.reviewDecision.create({
@@ -890,6 +916,7 @@ async function createReviewNotification(
 }
 
 export async function reviewCommunityPost(reviewerId: string, postId: string, input: PostReviewInput) {
+  const { isNormalizedPostMedia } = await import("@/lib/media-intake");
   const note = input.note.trim();
   if (input.decision !== "APPROVE" && note.length < 4) {
     throw new AppError("A review note is required for this decision.", 422, "REVIEW_NOTE_REQUIRED");
@@ -921,6 +948,10 @@ export async function reviewCommunityPost(reviewerId: string, postId: string, in
     }
 
     if (input.decision === "APPROVE") {
+      const creator = await tx.creatorProfile.findUnique({ where: { userId: post.authorId } });
+      if (creator?.status === "SUSPENDED") {
+        throw new AppError("Suspended creators cannot publish posts.", 409, "CREATOR_SUSPENDED");
+      }
       for (const media of post.media) {
         if (media.status === "REJECTED" || media.status === "PULLED") {
           throw new AppError(
@@ -939,7 +970,7 @@ export async function reviewCommunityPost(reviewerId: string, postId: string, in
           Boolean(media.altText.trim()) &&
           Boolean(media.sourceLabel?.trim()) &&
           Boolean(media.sourceUrl?.startsWith("https://")) &&
-          Boolean(media.publicUrl || media.storageKey);
+          isNormalizedPostMedia(media, post.authorId);
         if (!approvedAsset && !sourcedDirectMedia) {
           throw new AppError(
             "Every image must be SFW, source-labelled, and individually reviewable before publishing.",
@@ -974,7 +1005,11 @@ export async function reviewCommunityPost(reviewerId: string, postId: string, in
     });
 
     let creator = await tx.creatorProfile.findUnique({ where: { userId: post.authorId } });
-    if (input.decision === "APPROVE") {
+    const priorApproval = input.decision === "APPROVE" ? await tx.contributorTrustEvent.findFirst({
+      where: { userId: post.authorId, referenceId: postId, kind: "MODERATION_ACTION", points: 2 },
+      select: { id: true },
+    }) : null;
+    if (input.decision === "APPROVE" && !priorApproval) {
       const next = nextCreatorApprovalState(creator?.approvedPostCount ?? 0);
       creator = await tx.creatorProfile.upsert({
         where: { userId: post.authorId },
@@ -989,7 +1024,7 @@ export async function reviewCommunityPost(reviewerId: string, postId: string, in
           userId: post.authorId,
           actorUserId: reviewerId,
           kind: "MODERATION_ACTION",
-          points: input.decision === "APPROVE" ? 2 : input.decision === "REJECT" ? -2 : 0,
+          points: input.decision === "APPROVE" ? (priorApproval ? 0 : 2) : input.decision === "REJECT" ? -2 : 0,
           referenceId: postId,
           note: note || `Post review: ${input.decision}`,
         },
@@ -1000,12 +1035,16 @@ export async function reviewCommunityPost(reviewerId: string, postId: string, in
           type: "SOCIAL",
           title: input.decision === "APPROVE" ? "Post approved" : input.decision === "REQUEST_CHANGES" ? "Post needs changes" : "Post not published",
           body: note || (input.decision === "APPROVE" ? "Your post is now part of the community feed." : "Open the creator desk for review details."),
-          href: `/posts/${post.slug}`,
+          href: input.decision === "APPROVE" ? `/${post.language === "ZH_HANT" ? "zh-Hant" : "en"}/posts/${post.slug}` : `/${post.language === "ZH_HANT" ? "zh-Hant" : "en"}/me/posts?post=${encodeURIComponent(postId)}`,
           metadata: { postId, decision: input.decision },
         },
       }),
     ]);
 
+    if (input.decision === "APPROVE") {
+      const { notifyPostFollowers } = await import("@/lib/engagement");
+      await notifyPostFollowers(tx, updatedPost);
+    }
     return { post: serializePost(updatedPost), creator, replayed: false };
   });
 }

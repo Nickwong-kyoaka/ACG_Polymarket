@@ -32,7 +32,7 @@ describe("POST /api/me/onboarding", () => {
     mocks.profileUpdate.mockResolvedValue({ handle: "viewer", favoriteTags: ["new-season"], preferredLocale: "ZH_HANT", onboardingCompletedAt: new Date("2026-09-04T12:00:00.000Z") });
     mocks.followDeleteMany.mockResolvedValue({ count: 0 });
     mocks.followCreateMany.mockResolvedValue({ count: 2 });
-    mocks.transaction.mockImplementation((operation: (tx: unknown) => unknown) => operation({ profile: { update: mocks.profileUpdate }, characterFollow: { deleteMany: mocks.followDeleteMany, createMany: mocks.followCreateMany } }));
+    mocks.transaction.mockImplementation((operation: (tx: unknown) => unknown) => operation({ profile: { update: mocks.profileUpdate }, characterFollow: { deleteMany: mocks.followDeleteMany, createMany: mocks.followCreateMany }, analyticsEvent: { create: vi.fn() } }));
   });
 
   it("uses session identity and persists locale, interests, and character follows", async () => {

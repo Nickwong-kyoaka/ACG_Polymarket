@@ -1,11 +1,11 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
-import { Prisma } from "@prisma/client";
 import type { UserRole } from "@/lib/types";
 import { AuthenticationError, AuthorizationError } from "@/lib/api";
 import { STARTER_BALANCE } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
+import { classifyRetryablePrismaConflict, waitForSerializableRetry } from "@/lib/prisma-retry";
 
 const providers: NextAuthConfig["providers"] = [];
 const demoMode = process.env.NODE_ENV !== "production" && process.env.DEMO_MODE === "true";
@@ -56,14 +56,12 @@ async function provisionUser(input: {
   const email = input.email?.toLowerCase() ?? null;
   const requestedAdmin = Boolean(email && adminEmails().includes(email));
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt <= 3; attempt += 1) {
     try {
       return await prisma.$transaction(async (tx) => {
-    const existing = email
-      ? await tx.user.findUnique({ where: { email } })
-      : input.id
-        ? await tx.user.findUnique({ where: { id: input.id } })
-        : null;
+    const existing = input.id
+      ? await tx.user.findUnique({ where: { id: input.id } })
+      : email ? await tx.user.findUnique({ where: { email } }) : null;
     const role: UserRole = requestedAdmin || existing?.role === "ADMIN" ? "ADMIN" : "USER";
     const user = existing
       ? await tx.user.update({
@@ -81,6 +79,7 @@ async function provisionUser(input: {
         });
 
     const candidate = `${handleBase(email ?? input.name ?? user.id)}-${user.id.slice(-5)}`;
+    const previousWallet = await tx.wallet.findUnique({ where: { userId: user.id } });
     const wallet = await tx.wallet.upsert({
       where: { userId: user.id },
       create: { userId: user.id, softBalance: STARTER_BALANCE, premiumBalance: 0 },
@@ -96,9 +95,9 @@ async function provisionUser(input: {
         favoriteTags: [],
         pinnedCharacterIds: [],
       },
-      update: input.name ? { displayName: input.name } : {},
+      update: {},
     });
-    await tx.ledgerEntry.upsert({
+    if (!previousWallet) await tx.ledgerEntry.upsert({
       where: { idempotencyKey: `starter-${user.id}` },
       create: {
         walletId: wallet.id,
@@ -126,10 +125,8 @@ async function provisionUser(input: {
         return user;
       }, { isolationLevel: "Serializable" });
     } catch (error) {
-      const retryable =
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        (error.code === "P2002" || error.code === "P2034");
-      if (!retryable || attempt === 2) throw error;
+      if (!classifyRetryablePrismaConflict(error) || attempt === 3) throw error;
+      await waitForSerializableRetry(attempt + 1);
     }
   }
 

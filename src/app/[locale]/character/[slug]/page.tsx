@@ -12,6 +12,8 @@ import { getExchangeCopy, isPublicLocale, localePath, localizeAttribute, localiz
 import { Badge } from "@/components/ui/badge";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { WatchlistButton } from "@/components/watchlist-button";
+import { EntityProposalForm } from "@/components/entity-proposal-form";
+import { FollowButton } from "@/components/follow-button";
 import { compactNumber, currencyLabel } from "@/lib/utils";
 import { getCharacterView, getPortfolioView, getReactionSummary, getWatchlistIds } from "@/lib/store";
 import { publishedVisuals } from "@/lib/public-assets";
@@ -41,6 +43,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ loca
 
   return <div className="exchange-page pb-36 lg:pb-16">
     <Link href={localePath(locale, "/market")} className="inline-flex w-fit items-center gap-2 text-sm font-black text-slate-500 transition hover:text-[#e83c62]"><ArrowLeft className="h-4 w-4" />{page.back}</Link>
+    <div className="flex flex-wrap items-center gap-4"><FollowButton locale={locale} targetType="character" targetId={character.id} /><Link href={localePath(locale, `/series/${view.series.slug}`)} className="text-sm font-bold text-[#a34855]">{pick(locale, "Series & watch journal", "作品資料與追番簿")}</Link></div>
 
     <section className="exchange-panel overflow-hidden bg-[#111827] text-white">
       <div className="grid lg:grid-cols-[1.1fr_.9fr]">
@@ -82,6 +85,15 @@ export default async function CharacterPage({ params }: { params: Promise<{ loca
       <div className="exchange-panel p-6 sm:p-8"><SectionHeading eyebrow={page.rightsEyebrow} title={page.rightsTitle} description={page.rightsBody} /><div className="mt-7 grid gap-3"><div className="flex gap-3 rounded-[18px_5px_18px_5px] bg-[#eef8f7] p-4"><ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-[#19757a]" /><p className="text-sm leading-7 text-slate-600">{primaryAsset ? pick(locale, `Published as ${primaryAsset.permissionBadge ?? "source on file"}. The image source and takedown path remain visible.`, `此素材以「${primaryAsset.permissionBadge ?? "已有來源記錄"}」狀態發布，來源與下架入口持續公開。`) : character.rightsType === "ORIGINAL" ? pick(locale, "Original first-party character and demo asset pack.", "平台原創角色與自有示範素材，可在公開版使用。") : pick(locale, "Metadata-only listing. Official art, voice, logos, and comic pages are not bundled.", "只展示資料型角色資訊，不內含官方立繪、語音、標誌或漫畫頁。")}</p></div><div className="flex flex-wrap gap-3">{view.sourceAttribution ? <a href={view.sourceAttribution.sourceUrl} target="_blank" rel="noreferrer" className="exchange-button-secondary"><ExternalLink className="h-4 w-4" />{page.source}</a> : null}<Link href={localePath(locale, `/gallery/${character.slug}`)} className="exchange-button-secondary">{pick(locale, "Open gallery & credits", "查看畫廊與素材來源")}</Link></div></div></div>
     </section>
 
+    <EntityProposalForm entityType="CHARACTER" entityId={character.id} currentSummary={character.summary} locale={locale} fields={[
+      { key: "summary", label: pick(locale, "Summary", "介紹"), value: character.summary },
+      { key: "name", label: pick(locale, "Name", "名稱"), value: character.name },
+      { key: "title", label: pick(locale, "Headline", "標題"), value: character.title },
+      { key: "mood", label: pick(locale, "Comfort style", "陪伴氣質"), value: character.mood },
+      { key: "fandomPrompt", label: pick(locale, "Fan note", "角色筆記"), value: character.fandomPrompt },
+      { key: "favoritePhrase", label: pick(locale, "Favorite phrase", "喜歡的一句話"), value: character.favoritePhrase ?? "" },
+      { key: "releaseSeason", label: pick(locale, "Release season", "登場季別"), value: character.releaseSeason ?? "", localized: false },
+    ]} />
     <section className="grid gap-7"><SectionHeading eyebrow={page.commentsEyebrow} title={page.commentsTitle} description={page.commentsBody} /><CommentPanel characterId={character.id} comments={view.comments} reactions={reactions} locale={locale} /></section>
 
     {view.relatedCharacters.length ? <section className="grid gap-7"><SectionHeading eyebrow={page.relatedEyebrow} title={page.relatedTitle} description={page.relatedBody} /><div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">{view.relatedCharacters.map((related) => <CharacterCard key={related.id} character={related} locale={locale} />)}</div></section> : null}

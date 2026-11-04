@@ -1,7 +1,18 @@
-import { NotFoundError, apiOk, handleApiError } from "@/lib/api";
-import { getOptionalSessionUserId } from "@/lib/auth";
+import { NotFoundError, apiOk, handleApiError, parseJson } from "@/lib/api";
+import { getOptionalSessionUserId, requireSessionUserId } from "@/lib/auth";
 import { getExchangeFeatureFlags } from "@/lib/feature-flags";
-import { getPublicPost, postDetailQuerySchema } from "@/lib/social";
+import { createPostInputSchema, getPublicPost, postDetailQuerySchema, updateOwnPost } from "@/lib/social";
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const flags = getExchangeFeatureFlags();
+    if (!flags.community || !flags.submissions) throw new NotFoundError();
+    const userId = await requireSessionUserId();
+    const { id } = await params;
+    const input = createPostInputSchema.parse(await parseJson(request));
+    return apiOk(await updateOwnPost(userId, id, input));
+  } catch (error) { return handleApiError(error); }
+}
 
 export async function GET(
   request: Request,

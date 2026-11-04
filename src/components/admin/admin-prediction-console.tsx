@@ -15,6 +15,13 @@ interface AdminMarket {
   tradeCount: number;
   outcomes: Array<{ id: string; key: string }>;
   latestProposal: { id: string; status: string; challengeEndsAt: string } | null;
+  proposals: Array<{
+    id: string; status: string; outcome: string; reasoning: string; evidenceUrl: string;
+    challenges: Array<{
+      id: string; reason: string; evidenceUrl: string; accepted: boolean | null;
+      review: { reasoning: string; evidenceUrl: string; adminUserId: string; reviewedAt: string } | null;
+    }>;
+  }>;
 }
 
 interface AdminEvent {
@@ -30,6 +37,66 @@ async function apiRequest(path: string, method: "POST" | "PATCH", body: unknown)
   const payload = await response.json() as { error?: string };
   if (!response.ok) throw new Error(payload.error ?? `Request failed (${response.status})`);
   return payload;
+}
+
+function MarketOperations({ market, busy, run }: {
+  market: AdminMarket;
+  busy: string;
+  run: (key: string, operation: () => Promise<unknown>) => Promise<void>;
+}) {
+  const pendingReviews = market.proposals.some((proposal) => proposal.challenges.some((challenge) => challenge.accepted === null));
+  const terminal = ["RESOLVED", "VOID"].includes(market.status);
+  const finalizeReady = market.latestProposal && !pendingReviews && new Date(market.latestProposal.challengeEndsAt) <= new Date();
+  const values = (form: HTMLFormElement) => Object.fromEntries(new FormData(form));
+  const path = `/api/admin/predictions/${encodeURIComponent(market.id)}`;
+  return <div className="rounded-xl border border-[#171126]/10 bg-[#fffaf4] p-4">
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="max-w-3xl">
+        <p className="text-[10px] font-black uppercase tracking-[.15em] text-slate-400">{market.status} / {market.tradeCount} trades / {market.participantCount} participants</p>
+        <h4 className="mt-2 text-sm font-black leading-6 text-[#171126]">{market.question}</h4>
+        <p className="mt-1 text-xs text-slate-500">Closes {new Date(market.closesAt).toLocaleString()}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {market.status === "DRAFT" ? <button type="button" disabled={Boolean(busy) || new Date(market.closesAt) <= new Date()} onClick={() => run(`open-${market.id}`, () => apiRequest(path, "PATCH", { action: "OPEN" }))} className="exchange-button-secondary"><Play className="h-4 w-4" />Open</button> : null}
+        {market.status === "OPEN" ? <button type="button" disabled={Boolean(busy)} onClick={() => run(`lock-${market.id}`, () => apiRequest(path, "PATCH", { action: "LOCK" }))} className="exchange-button-secondary"><Lock className="h-4 w-4" />Lock</button> : null}
+        {market.latestProposal ? <button type="button" disabled={Boolean(busy) || !finalizeReady} onClick={() => run(`finalize-${market.id}`, () => apiRequest(`${path}/finalize`, "POST", { proposalId: market.latestProposal?.id }))} className="exchange-button-secondary"><CheckCircle2 className="h-4 w-4" />Finalize</button> : null}
+      </div>
+    </div>
+    {pendingReviews ? <p className="mt-3 text-xs font-bold text-amber-900">Review every challenge individually before finalizing, voiding, or re-proposing.</p> : null}
+    {market.proposals.map((proposal) => <section key={proposal.id} className="mt-4 border-t border-[#171126]/15 pt-3">
+      <h5 className="text-xs font-black">{proposal.outcome}: {proposal.status === "VOIDED" && !terminal ? "Invalidated proposal" : proposal.status}</h5>
+      <p className="mt-2 text-xs">{proposal.reasoning}</p>
+      <a className="text-xs underline" href={proposal.evidenceUrl} target="_blank" rel="noreferrer">Proposal evidence</a>
+      {proposal.challenges.map((challenge) => <article key={challenge.id} className="mt-3 rounded-lg border border-amber-200 p-3">
+        <p className="text-xs font-bold">{challenge.reason}</p>
+        <a className="text-xs underline" href={challenge.evidenceUrl} target="_blank" rel="noreferrer">Challenge evidence</a>
+        {challenge.accepted === null && !terminal ? <form className="mt-3 grid gap-2" onSubmit={(event) => {
+          event.preventDefault();
+          const data = values(event.currentTarget);
+          void run(`review-${challenge.id}`, () => apiRequest(`${path}/challenges/${challenge.id}`, "POST", { accepted: data.decision === "ACCEPT", reasoning: data.reasoning, evidenceUrl: data.evidenceUrl }));
+        }}>
+          <select name="decision" required className="filter-field" aria-label="Challenge decision"><option value="">Choose a decision</option><option value="ACCEPT">Accept: invalidate and correct proposal</option><option value="REJECT">Reject: keep proposed result</option></select>
+          <input name="evidenceUrl" type="url" pattern="https://.*" required placeholder="https://review-evidence" className="filter-field" aria-label="Review evidence URL" />
+          <textarea name="reasoning" required minLength={10} maxLength={3000} placeholder="Explain this individual decision" className="filter-field" aria-label="Review reasoning" />
+          <button disabled={Boolean(busy)} className="exchange-button-secondary">Save independent review</button>
+        </form> : <div className="mt-2 text-xs"><strong>{challenge.accepted ? "Accepted" : challenge.accepted === false ? "Rejected" : "Pending"}</strong>{challenge.review ? <p>{challenge.review.reasoning} <a href={challenge.review.evidenceUrl} target="_blank" rel="noreferrer" className="underline">Review evidence</a> / {challenge.review.adminUserId} / {new Date(challenge.review.reviewedAt).toLocaleString()}</p> : null}</div>}
+      </article>)}
+    </section>)}
+    {["LOCKED", "OPEN"].includes(market.status) && !market.latestProposal ? <form className="mt-4 grid gap-2 border-t border-[#171126]/10 pt-4" onSubmit={(event) => {
+      event.preventDefault();
+      void run(`propose-${market.id}`, () => apiRequest(`${path}/propose`, "POST", values(event.currentTarget)));
+    }}>
+      <select name="outcome" className="filter-field" aria-label="Proposed outcome"><option>YES</option><option>NO</option></select>
+      <input name="evidenceUrl" type="url" pattern="https://.*" required defaultValue={market.sourceUrl} className="filter-field" aria-label="Proposal evidence URL" />
+      <textarea name="reasoning" required minLength={10} maxLength={3000} placeholder="Evidence-based reasoning for this proposal or correction" className="filter-field" aria-label="Proposal reasoning" />
+      <button disabled={Boolean(busy) || pendingReviews} className="exchange-button-primary">Propose with a new 24-hour challenge window</button>
+    </form> : null}
+    {!terminal ? <form className="mt-3 flex gap-2" onSubmit={(event) => {
+      event.preventDefault();
+      const data = values(event.currentTarget);
+      void run(`void-${market.id}`, () => apiRequest(`${path}/void`, "POST", data));
+    }}><input name="reason" required minLength={10} placeholder="Void and refund reason" className="filter-field" aria-label="Void reason" /><button disabled={Boolean(busy) || pendingReviews} className="exchange-button-secondary">Void</button></form> : null}
+  </div>;
 }
 
 export function AdminPredictionConsole({ events, treasury }: { events: AdminEvent[]; treasury: { balance: number; reserved: number; available: number; requiredReserve?: number } }) {
@@ -126,7 +193,7 @@ export function AdminPredictionConsole({ events, treasury }: { events: AdminEven
 
     <section>
       <div className="flex items-end justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[.18em] text-[#ff3d7f]">Market operations</p><h2 className="mt-2 font-display text-4xl text-[#171126]">Event ledger</h2></div><button type="button" onClick={() => window.location.reload()} className="exchange-button-secondary"><RefreshCcw className="h-4 w-4" />Refresh</button></div>
-      <div className="mt-5 grid gap-6">{events.map((event) => <article key={event.id} className="rounded-[1.5rem] border border-[#171126]/10 bg-white p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#b4235a]">{event.category}</p><h3 className="mt-2 font-display text-3xl text-[#171126]">{event.title}</h3></div><span className="rounded-lg bg-[#fff2c5] px-3 py-2 text-xs font-black">{event.markets.length} markets</span></div><div className="mt-5 grid gap-4">{event.markets.map((market) => <div key={market.id} className="rounded-xl border border-[#171126]/10 bg-[#fffaf4] p-4"><div className="flex flex-wrap items-start justify-between gap-4"><div className="max-w-3xl"><p className="text-[10px] font-black uppercase tracking-[.15em] text-slate-400">{market.status} · {market.tradeCount} trades · {market.participantCount} participants</p><h4 className="mt-2 text-sm font-black leading-6 text-[#171126]">{market.question}</h4><p className="mt-1 text-xs text-slate-500">Closes {new Date(market.closesAt).toLocaleString()}</p></div><div className="flex flex-wrap gap-2">{market.status === "DRAFT" ? <button type="button" disabled={Boolean(busy)} onClick={() => run(`open-${market.id}`, () => apiRequest(`/api/admin/predictions/${market.id}`, "PATCH", { action: "OPEN" }))} className="rounded-lg bg-emerald-100 px-3 py-2 text-xs font-black text-emerald-800"><Play className="mr-1 inline h-3.5 w-3.5" />Open</button> : null}{market.status === "OPEN" ? <button type="button" disabled={Boolean(busy)} onClick={() => run(`lock-${market.id}`, () => apiRequest(`/api/admin/predictions/${market.id}`, "PATCH", { action: "LOCK" }))} className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-black text-amber-900"><Lock className="mr-1 inline h-3.5 w-3.5" />Lock</button> : null}{market.latestProposal ? <button type="button" disabled={Boolean(busy)} onClick={() => run(`finalize-${market.id}`, () => apiRequest(`/api/admin/predictions/${market.id}/finalize`, "POST", { proposalId: market.latestProposal?.id }))} className="rounded-lg bg-sky-100 px-3 py-2 text-xs font-black text-sky-900"><CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />Finalize</button> : null}</div></div>{["LOCKED", "OPEN"].includes(market.status) && !market.latestProposal ? <form className="mt-4 grid gap-2 border-t border-[#171126]/10 pt-4 sm:grid-cols-[110px_1fr_1fr_auto]" onSubmit={(submitEvent) => { submitEvent.preventDefault(); const data = new FormData(submitEvent.currentTarget); void run(`propose-${market.id}`, () => apiRequest(`/api/admin/predictions/${market.id}/propose`, "POST", { outcome: field(data, "outcome"), evidenceUrl: field(data, "evidenceUrl"), reasoning: field(data, "reasoning") })); }}><select name="outcome" className="filter-field"><option>YES</option><option>NO</option></select><input name="evidenceUrl" type="url" required defaultValue={market.sourceUrl} className="filter-field" /><input name="reasoning" required minLength={10} placeholder="Evidence-based reasoning" className="filter-field" /><button className="rounded-lg bg-[#171126] px-3 py-2 text-xs font-black text-white">Propose</button></form> : null}<form className="mt-3 flex gap-2" onSubmit={(submitEvent) => { submitEvent.preventDefault(); const data = new FormData(submitEvent.currentTarget); void run(`void-${market.id}`, () => apiRequest(`/api/admin/predictions/${market.id}/void`, "POST", { reason: field(data, "reason") })); }}><input name="reason" required minLength={10} placeholder="Void and refund reason" className="filter-field" /><button className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800">Void</button></form></div>)}</div></article>)}</div>
+      <div className="mt-5 grid gap-6">{events.map((event) => <article key={event.id} className="rounded-[1.5rem] border border-[#171126]/10 bg-white p-5 sm:p-6"><p className="text-xs font-black">{event.category}</p><h3 className="mt-2 font-display text-3xl">{event.title}</h3><div className="mt-5 grid gap-4">{event.markets.map((market) => <MarketOperations key={market.id} market={market} busy={busy} run={run} />)}</div></article>)}</div>
     </section>
   </div>;
 }

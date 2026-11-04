@@ -37,6 +37,7 @@ export async function POST(request: Request) {
         data: publishedCharacters.map(({ id }) => ({ userId, characterId: id })),
         skipDuplicates: true,
       });
+      await tx.analyticsEvent.create({ data: { userId, name: "ONBOARDING_COMPLETED", locale: input.locale === "zh-Hant" ? "ZH_HANT" : "EN", metadata: { characterCount: publishedCharacters.length } } });
       return { profile, characterIds: publishedCharacters.map(({ id }) => id) };
     });
 
