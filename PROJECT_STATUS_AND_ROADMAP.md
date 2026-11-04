@@ -19,9 +19,9 @@
 | 房间与陪伴 | 资料/置顶/隐私设置，公开及私人房间外观显示，商店预览和装备；安慰页读取数据库语音及漫画，有库存时解锁相应内容。 | 新的角色音频文件、衣装分类及原创漫画仍需制作或上传；浏览器朗读明确作为后备。 |
 | 发现、通知与分析 | 跨角色/笔记/作品搜索，通知分页、本地化和偏好；分享及引导事件；推荐每 20 条作者最多 2 条、作品最多 4 条；管理员活动与 D1/D7 样本统计。 | 暂无足够真实使用数据证明留存或增长；阅读完成度排序、QR 分享图和查询扩容仍待完善。 |
 
-验证与部署记录：本地检查使用项目要求的 Node 22.20。`lint`、TypeScript、Prisma schema 验证和 production build 通过；单元/组件回归为 **289 通过、5 项数据库测试跳过**。production 依赖公告更新后，`npm audit --omit=dev` 为 **0 项漏洞**，不代表开发依赖也为零。双语页面按请求生成 HTML，正式建置不再尝试读取数据库。数据库集成测试只在显式配置 `TEST_DATABASE_URL` 且库名包含独立 `test` 段时运行，普通 `DATABASE_URL` 不会作为测试库。新增 4 个 Playwright 浏览器情境，已验证测试发现及 CI 隔离 Postgres 配置，但未执行浏览器验收。
+验证与部署记录：本地检查使用项目要求的 Node 22.20。`lint`、TypeScript、Prisma schema 验证和 production build 通过；单元/组件回归为 **290 通过、5 项数据库测试在本机跳过**。production 依赖公告更新后，`npm audit --omit=dev` 为 **0 项漏洞**，不代表开发依赖也为零。双语页面按请求生成 HTML，正式建置不再尝试读取数据库。数据库集成测试只在显式配置 `TEST_DATABASE_URL` 且库名包含独立 `test` 段时运行，普通 `DATABASE_URL` 不会作为测试库。
 
-本机 Docker 启动遇到 Inference manager socket 错误，启动指令已停止；没有再启动 Docker，也没有执行真实数据库写入测试。因此本轮不能声称数据库集成、Playwright/视觉、真实 Google OAuth、Render 健康检查或 S3 已通过现场验收。
+本机 Docker 启动遇到 Inference manager socket 错误，启动指令已停止，没有再启动 Docker。随后通过 GitHub Actions 的独立 Postgres 通过了 migration、schema drift、数据库集成测试及 production build。本机没有执行数据库写入测试；真实 Google OAuth、Render 健康检查或 S3 仍未现场验收。新增 4 个 Playwright 浏览器情境；远端首次执行发现投稿内文的 accessible name 混入字数计数，已以组件回归测试重现并修正，完整浏览器验收等待重跑。
 
 下一步按环境依赖执行：配置隔离测试库运行集成与浏览器测试，确认 Render Google 回调和两个 S3 bucket，管理员审核草稿预测模板；之后补齐独立角色音频/漫画、章节审核发布、关系图和更完整的后台资料编辑。
 
