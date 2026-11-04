@@ -79,7 +79,15 @@ Copy `.env.example` to `.env` first. The default local PostgreSQL connection is 
 
 ## Render deployment
 
-The repository includes a `render.yaml` Blueprint configured for `main`, Singapore, automatic deploys after passing checks, database migrations, idempotent bootstrap, and `/api/health`.
+Public deployment is paused. Continue local development and GitHub backups until an explicit production launch. CI only tests the app; it does not provision hosting.
+
+Use `[skip render]` in backup commit messages while launch is paused, including when an existing Render service has not yet been confirmed to have Auto-Deploy off. This does not cancel deployments already queued or running.
+
+The repository includes a future `render.yaml` Blueprint for `main`, Singapore, database migrations, idempotent bootstrap, and `/api/health`. `autoDeployTrigger: off` keeps Git pushes from automatically deploying after this setting is applied. Creating a service or clicking Manual Deploy can still deploy it. For any service already linked in Render, turn Auto-Deploy off in its dashboard and cancel pending deploys; editing this file alone does not confirm the account setting changed.
+
+Before a permanent launch, choose always-on hosting and durable database/media storage, configure the final domain and Google callback, verify backups and restores, and enable monitoring. The included free-plan blueprint is a development reference, not a selected permanent-hosting plan. Do not provision or upgrade paid services until the hosting choice and cost are confirmed.
+
+When ready for the explicitly approved launch:
 
 1. Create a Neon PostgreSQL project and copy its pooled `postgresql://...` connection string.
 2. In Render, choose **New > Blueprint**, connect `Nickwong-kyoaka/ACG_Polymarket`, and select `main`.

@@ -5,7 +5,7 @@ services:
     plan: free
     region: singapore
     branch: main
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: "off"
     buildCommand: npm ci && npm run prisma:generate && npm run build
     startCommand: npx prisma migrate deploy && npm run db:bootstrap && npm run start -- -H 0.0.0.0 -p $PORT
     initialDeployHook: npm run db:bootstrap
