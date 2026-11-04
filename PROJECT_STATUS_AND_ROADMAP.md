@@ -21,9 +21,9 @@
 
 验证与部署记录：本地检查使用项目要求的 Node 22.20。`lint`、TypeScript、Prisma schema 验证和 production build 通过；单元/组件回归为 **290 通过、5 项数据库测试在本机跳过**。production 依赖公告更新后，`npm audit --omit=dev` 为 **0 项漏洞**，不代表开发依赖也为零。双语页面按请求生成 HTML，正式建置不再尝试读取数据库。数据库集成测试只在显式配置 `TEST_DATABASE_URL` 且库名包含独立 `test` 段时运行，普通 `DATABASE_URL` 不会作为测试库。
 
-本机 Docker 启动遇到 Inference manager socket 错误，启动指令已停止，没有再启动 Docker。随后通过 GitHub Actions 的独立 Postgres 通过了 migration、schema drift、数据库集成测试及 production build。本机没有执行数据库写入测试；真实 Google OAuth、Render 健康检查或 S3 仍未现场验收。新增 4 个 Playwright 浏览器情境；远端首次执行发现投稿内文的 accessible name 混入字数计数，已以组件回归测试重现并修正，完整浏览器验收等待重跑。
+本机 Docker 启动遇到 Inference manager socket 错误，启动指令已停止，没有再启动 Docker。随后通过 GitHub Actions 的独立 Postgres 通过了 migration、schema drift、数据库集成测试及 production build。本机没有执行数据库写入测试；真实 Google OAuth、Render 健康检查或 S3 仍未现场验收。远端首次浏览器测试发现投稿内文的 accessible name 混入字数计数，已以组件回归重现并修正。修正后 **4 个 Playwright 情境全部通过**：双语及 390/768/1440px 溢出/hydration 检查、Demo 登录与服务器草稿编辑重投、打工刷新恢复，以及签到/签名报价/买卖/幂等重播/关注/留言/外观装备。验收代码为 `a7e8ecd`，记录见 [GitHub Actions](https://github.com/Nickwong-kyoaka/ACG_Polymarket/actions/runs/41792981454)。浏览器验收使用开发测试身份，不替代真实 Google OAuth 验收；也不代表所有新增页面都已做人工视觉审查。
 
-下一步按环境依赖执行：配置隔离测试库运行集成与浏览器测试，确认 Render Google 回调和两个 S3 bucket，管理员审核草稿预测模板；之后补齐独立角色音频/漫画、章节审核发布、关系图和更完整的后台资料编辑。
+下一步按环境依赖执行：确认 Render Google 回调和两个 S3 bucket，管理员审核草稿预测模板；之后补齐独立角色音频/漫画、章节审核发布、关系图和更完整的后台资料编辑。隔离数据库与浏览器回归已纳入每次提交的 CI；本机需要时另设 `TEST_DATABASE_URL`，无需依赖 Docker Desktop。
 
 ## 1. 总体判断与核验范围
 
