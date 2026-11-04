@@ -62,4 +62,13 @@ jobs:
       - run: npm run test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - name: Browser acceptance
+        run: |
+          if npm run test:e2e > "$RUNNER_TEMP/acg-e2e.log" 2>&1; then
+            cat "$RUNNER_TEMP/acg-e2e.log"
+          else
+            cat "$RUNNER_TEMP/acg-e2e.log"
+            export ACG_E2E_LOG="$RUNNER_TEMP/acg-e2e.log"
+            node -e 'const fs = require("node:fs"); const tail = fs.readFileSync(process.env.ACG_E2E_LOG, "utf8").slice(-24000); console.log("::error title=Browser acceptance failed::" + tail.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A"));'
+            exit 1
+          fi
